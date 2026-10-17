@@ -1,0 +1,11 @@
+__pycache__/
+.DS_Store
+
+# iOS app
+ios/build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# local editor and app settings
+.claude/

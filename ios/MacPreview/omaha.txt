@@ -1,0 +1,35 @@
+# Plays Omaha Beach to a win. Run with:
+#   ios/tools/mac-preview.sh --test ios/MacPreview/omaha.txt --out /tmp/angry-shots
+pack ww2
+open 0
+shot omaha-start
+aim rifleman 590 214        # over the wall onto the officer
+settle
+aim grenade 500 252 0.9      # lob it into the MG 42 nest
+settle
+report
+# the grenadier hides between two crates under a plank: drop mortar shells on top of him
+aim mortar 542 222 1 high
+wait 900
+shot omaha-mortar
+settle
+aim mortar 542 222 1 high
+settle
+aim engineer 540 225 1 high
+wait 1500
+tap
+settle
+aim rifleman 542 230 1 high
+settle
+aim grenade 542 236 1 high
+settle
+aim rifleman 542 230 1 high
+settle
+aim grenade 542 236 1 high
+settle
+use jeep
+settle
+report
+result
+shot omaha-result
+expect win
