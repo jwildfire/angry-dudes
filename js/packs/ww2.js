@@ -1,4 +1,4 @@
-// Battle pack: World War II · Normandy, the Ardennes and the Rhine, 1944-1945
+// Battle pack: World War II · Normandy, France, the Ardennes and the Rhine, 1944-1945
 //
 // How a pack is put together (every pack file follows this shape):
 //   units      everything the player can use. kind: sling | fire | drive | air
@@ -7,7 +7,7 @@
 //   defenders  the computer's soldiers and machines; react: how they fight back
 //   themes     sky, hills and ground colors for the levels
 //   levels     fort drawings, top row first. Columns are 16 px wide.
-//              Any row containing = or ~ is an 8 px slab (one long piece per run of the same character).
+//              Slab pieces (here = concrete, ~ wooden plank, ^ roof tiles) are 8 px tall: one long piece per run of the same character.
 //              A defender stands at the bottom of its row; "-" continues a wide defender to the right.
 (window.ANGRY_PACKS = window.ANGRY_PACKS || []).push({
   id: "ww2",
@@ -16,7 +16,7 @@
   side: "U.S. Army",
   foe: "German Army",
   icon: "sherman",
-  blurb: "Sling GIs, fire bazookas, drive Shermans and halftracks, drop paratroopers and call in bombers and battleships.",
+  blurb: "Sling GIs and gliders, fire bazookas, drive Shermans and Rhino tanks, drop paratroopers and call in bombers and battleships.",
   props: { bunker: "sandbag", pennant: ["#e0412c", "#ffffff"] },
 
   units: {
@@ -45,6 +45,15 @@
                 tap: "shoot", shots: 3, gun: { x: 26, y: -10, vx: 14, vy: -0.5 },
                 shell: { sprite: "proj_tankshell", w: 6, h: 3, density: 0.004, lift: 0.9, impact: true, boom: { r: 22, p: 3.2 }, best: "concrete" },
                 hint: "Tap to roll out. Tap again to fire the main gun (3 shells)." },
+    rhino:    { name: "Rhino tank", kind: "drive", sprite: "rhino", w: 44, h: 16, density: 0.006, best: "hedge", speed: 0.75, push: 0.3, hp: 10,
+                tap: "ram", ramSpeed: 2.6, shout: "CUT THROUGH!",
+                hint: "A Sherman with steel teeth welded on the front. Tap to roll out, then tap again to ram straight through hedgerows." },
+    bayonet:  { name: "Bayonet charge", kind: "sling", sprite: "bayonet_gi", w: 14, h: 16, density: 0.003, best: "grenadier",
+                tap: "dash", dash: 15, pierce: 1, pierceDmg: 5, shout: "FIX BAYONETS!",
+                hint: "Launch, then tap to charge forward with the bayonet. He can run right through one soldier and keep going." },
+    glider:   { name: "Glider", kind: "sling", sprite: "glider", w: 32, h: 10, density: 0.003, power: 1.3, best: "flak88",
+                tap: "split", splitInto: "rifleman", shout: "GLIDER RIDERS!",
+                hint: "A glider has no engine, so launch it hard. Tap in the air and two glider troopers jump out beside it." },
     p51:      { name: "Mustang", kind: "air", style: "plane", sprite: "p51", bombs: 2, spacing: 16, speed: 2.2, alt: 40,
                 bomb: { sprite: "proj_bomb", w: 10, h: 4, impact: true, boom: { r: 30, p: 3.5 } },
                 hint: "Tap the spot where the Mustang should drop its bombs." },
@@ -71,8 +80,11 @@
                 proj: { sprite: "proj_shell", w: 8, h: 4, density: 0.006, impact: true, boom: { r: 34, p: 4 } },
                 hint: "Battleships far out at sea fire four giant shells. Tap the target." }
   },
-  order: ["rifleman", "para", "engineer", "sarge", "grenade", "bazooka", "mortar", "howitzer", "jeep", "halftrack", "sherman", "p51", "p51s", "p47", "rockets", "c47", "b26", "b17", "naval"],
+  order: ["rifleman", "para", "bayonet", "engineer", "sarge", "glider", "grenade", "bazooka", "mortar", "howitzer", "jeep", "halftrack", "sherman", "rhino",
+          "p51", "p51s", "p47", "rockets", "c47", "b26", "b17", "naval"],
 
+  // fort letters: S sandbags, W ammo crate, C concrete, Q stone wall, B brick wall, Y hedgerow, J jerrycan (explodes),
+  // H hedgehog, X barbed wire and D dragon's teeth (these three are fixed in place)
   blocks: {
     S: { key: "sandbag",  hp: 1.5, density: 0.0025, pts: 100, debris: ["#d9bc80", "#a9884f"] },
     W: { key: "wood",     hp: 2.2, density: 0.0015, pts: 200, debris: ["#a8693a", "#5e3a1d"] },
@@ -81,9 +93,14 @@
     X: { key: "wire",     hp: 1,   density: 0.001,  pts: 100, debris: ["#646d7b", "#a8693a"], w: 16, h: 10, fixed: true, sensor: true },
     Y: { key: "hedge",    name: "Hedgerow", hp: 2, density: 0.0012, pts: 100, debris: ["#3e6638", "#6fa852"] },
     J: { key: "jerrycan", hp: 0.5, density: 0.0015, pts: 200, debris: ["#c9b46c", "#9b864b"], w: 13, h: 14, explodes: { r: 34, p: 3.5 } },
+    D: { key: "dragonstooth", name: "Dragon's teeth", hp: 7, density: 0.006, pts: 300, debris: ["#c4c7cb", "#74787e"], w: 16, h: 14, fixed: true },
+    Q: { key: "stone", name: "Stone wall", hp: 4, density: 0.004, pts: 400, debris: ["#a39b8b", "#cbc4b4"] },
+    B: { key: "brick", name: "Brick wall", hp: 4, density: 0.004, pts: 400, debris: ["#b9533a", "#d9c4aa"] },
+    "^": { key: "tiles", sprite: "tiles", name: "Roof", slab: true, hp: 2.5, density: 0.002, pts: 300, debris: ["#b9533a", "#7d3424"] },
     "=": { key: "concrete", slab: true, hp: 6, density: 0.004, pts: 800, debris: ["#9a9ea3", "#74787e"] },
     "~": { key: "wood", slab: true, hp: 2.5, density: 0.0015, pts: 300, debris: ["#a8693a", "#5e3a1d"] }
   },
+  // g grenadier, n sniper, o officer, p Panzerfaust soldier, m MG 42 nest, h 105 mm gun, f Flak 88, l light tank, t Tiger, v V-1 ramp
   defenders: {
     g: { key: "grenadier", name: "Grenadier", w: 12, h: 17, hp: 1.5, density: 0.002, pts: 500 },
     n: { key: "sniper",    name: "Sniper", w: 12, h: 17, hp: 1.5, density: 0.002, pts: 1000, react: { type: "sniper", say: "SNIPER!" } },
@@ -98,7 +115,13 @@
     v: { key: "v1_ramp", name: "V-1 launch ramp", w: 48, h: 16, hp: 4, density: 0.006, pts: 4000, cells: 3, explodes: { r: 40, p: 4 }, fire: true },
     t: { key: "tiger",     name: "Tiger", w: 50, h: 20, hp: 9, density: 0.008, pts: 8000, cells: 4, ox: -3,
          react: { type: "antitank", every: 1900, range: 300, muzzle: { x: -34, y: -8 }, vx: -13, vy: -0.4,
-                  shell: { sprite: "proj_tankshell", w: 6, h: 3, density: 0.004, lift: 0.9, impact: true, enemy: true, boom: { r: 18, p: 3 } } } }
+                  shell: { sprite: "proj_tankshell", w: 6, h: 3, density: 0.004, lift: 0.9, impact: true, enemy: true, boom: { r: 18, p: 3 } } } },
+    l: { key: "lighttank", name: "Light tank", w: 32, h: 16, hp: 4, density: 0.006, pts: 3000, cells: 2,
+         react: { type: "antitank", every: 2400, range: 260, muzzle: { x: -22, y: -11 }, vx: -11, vy: -1.2,
+                  shell: { sprite: "proj_tankshell", w: 6, h: 3, density: 0.004, lift: 0.9, impact: true, enemy: true, boom: { r: 16, p: 2.6 } } } },
+    p: { key: "panzerfaust", name: "Panzerfaust soldier", w: 12, h: 17, hp: 1.5, density: 0.002, pts: 1500,
+         react: { type: "antitank", every: 3000, range: 160, muzzle: { x: -10, y: -6 }, vx: -9, vy: -2.5,
+                  shell: { sprite: "proj_pzf", w: 10, h: 5, density: 0.004, lift: 0.75, impact: true, enemy: true, boom: { r: 20, p: 3 } } } }
   },
 
   themes: {
@@ -118,63 +141,201 @@
              right: { top: "#6f8a3c", hi: "#8fa85a", base: "#5a4630", lo: "#43341f" } },
     snow:  { sky: ["#8a96a6", "#a6b0bd", "#c5cdd7"], clouds: false, hills: ["#c9d2da", "#aab6bf"], trees: "pine", weather: "snow", split: 9999,
              left:  { top: "#f4f7fb", hi: "#ffffff", base: "#dfe7ef", lo: "#c3cfdb" },
-             right: { top: "#f4f7fb", hi: "#ffffff", base: "#dfe7ef", lo: "#c3cfdb" } }
+             right: { top: "#f4f7fb", hi: "#ffffff", base: "#dfe7ef", lo: "#c3cfdb" } },
+    // `skyline` paints rooftops, a church or ruined walls on the horizon instead of plain hills
+    night: { sky: ["#0b1430", "#14224a", "#22335f"], night: true, hills: ["#1d3328", "#152a20"], trees: "oak", treeColor: "#1f3a24", skyline: "village",
+             split: 9999, water: "#1d3a5e", waterHi: "#4f7fb0",
+             left:  { top: "#2f5a35", hi: "#3f7244", base: "#3e2a1a", lo: "#2c1d12" },
+             right: { top: "#2f5a35", hi: "#3f7244", base: "#3e2a1a", lo: "#2c1d12" } },
+    dawn:  { sky: ["#7fa6db", "#b7c9e6", "#f1d2b0"], sun: "#fff0b3", clouds: true, hills: ["#93ad9a", "#738f7c"], split: 440,
+             left:  { top: "#e3c98e", hi: "#f1dfb0", base: "#d6b878", lo: "#bf9f5f" },
+             right: { top: "#6aa84a", hi: "#94cf68", base: "#8b6a3b", lo: "#6b4f2a" } },
+    marsh: { sky: ["#8fb3cf", "#b0c9dc", "#d6e2ea"], sun: "#fff3c0", clouds: true, cloud: "#eef2f4", hills: ["#7f9f6a", "#62855a"], trees: "oak", treeColor: "#456b3e",
+             water: "#5b7f8f", waterHi: "#b9d3dc", split: 9999,
+             left:  { top: "#5d9a45", hi: "#86c060", base: "#6b5034", lo: "#4e3a24" },
+             right: { top: "#5d9a45", hi: "#86c060", base: "#6b5034", lo: "#4e3a24" } },
+    town:  { sky: ["#74b4e6", "#9ccaef", "#cbe3f5"], sun: "#ffe25a", clouds: true, hills: ["#7fb06a", "#5f9450"], trees: "oak", treeColor: "#3e6638", skyline: "village",
+             water: "#5b7f8f", waterHi: "#b9d3dc", split: 9999,
+             left:  { top: "#4fae3f", hi: "#8bd85e", base: "#7a5634", lo: "#5a3c22" },
+             right: { top: "#4fae3f", hi: "#8bd85e", base: "#7a5634", lo: "#5a3c22" } },
+    ruins: { sky: ["#9aa8b3", "#b9c2c6", "#dcd8cc"], clouds: true, cloud: "#d0d2cf", hills: ["#8f9a7c", "#77846a"], trees: "stump", treeColor: "#5a4a38", skyline: "ruins",
+             split: 9999,
+             left:  { top: "#6f8f45", hi: "#93b060", base: "#6b5a46", lo: "#4f4232" },
+             right: { top: "#6f8f45", hi: "#93b060", base: "#6b5a46", lo: "#4f4232" } },
+    dust:  { sky: ["#93b3cc", "#bfc8c4", "#e3d6b4"], sun: "#ffe9a0", clouds: true, cloud: "#e6dcc4", hills: ["#8fa868", "#738f52"], trees: "oak", treeColor: "#4f6b38",
+             split: 9999,
+             left:  { top: "#6ea444", hi: "#98c862", base: "#7a5634", lo: "#5a3c22" },
+             right: { top: "#6ea444", hi: "#98c862", base: "#7a5634", lo: "#5a3c22" } },
+    paris: { sky: ["#5fb0f0", "#8ccaf5", "#c4e6fb"], sun: "#ffe25a", clouds: true, hills: ["#9fb8b0", "#86a096"], skyline: "city", split: 9999,
+             left:  { top: "#b9b2a2", hi: "#d8d2c2", base: "#8f8676", lo: "#736b5d" },
+             right: { top: "#b9b2a2", hi: "#d8d2c2", base: "#8f8676", lo: "#736b5d" } },
+    westwall: { sky: ["#8e9fb0", "#aebdca", "#d3dbe0"], clouds: true, cloud: "#e4e8ea", hills: ["#7c8a5e", "#66744c"], trees: "pine", treeColor: "#3e4a3a",
+             split: 9999,
+             left:  { top: "#8a8f3e", hi: "#aaae5c", base: "#6a5236", lo: "#4e3c26" },
+             right: { top: "#8a8f3e", hi: "#aaae5c", base: "#6a5236", lo: "#4e3c26" } },
+    aachen: { sky: ["#7f8c99", "#9ea8b0", "#c2c6c4"], clouds: true, cloud: "#b6bbbc", hills: ["#7a7f70", "#646a5c"], skyline: "ruins", split: 9999,
+             left:  { top: "#8a8a78", hi: "#a8a894", base: "#62584a", lo: "#4a4238" },
+             right: { top: "#8a8a78", hi: "#a8a894", base: "#62584a", lo: "#4a4238" } },
+    forest: { sky: ["#4f5a5f", "#667276", "#848f90"], clouds: true, cloud: "#9aa3a5", hills: ["#2f3f30", "#253326"], trees: "pine", treeColor: "#1a261d",
+             weather: "rain", split: 9999,
+             trench: { cut: "#2e2216", plank: "#5a4028", floor: "#5e4a30", slat: "#3e2a18" },
+             left:  { top: "#4f5a2c", hi: "#66723a", base: "#4a3826", lo: "#36281a" },
+             right: { top: "#4f5a2c", hi: "#66723a", base: "#4a3826", lo: "#36281a" } },
+    spring: { sky: ["#86b4dc", "#a9c9e6", "#d4e2ec"], sun: "#fff0b3", clouds: true, cloud: "#e8ecef", hills: ["#8aa86a", "#6f8f58"], trees: "oak", treeColor: "#5a7d42",
+             water: "#4a6b80", waterHi: "#a9c2d0", split: 9999,
+             left:  { top: "#6f9a3c", hi: "#94bc5a", base: "#5a4630", lo: "#43341f" },
+             right: { top: "#6f9a3c", hi: "#94bc5a", base: "#5a4630", lo: "#43341f" } }
   },
 
-  // The campaign: these battles in order on a map, from the beaches of Normandy to the Rhine.
+  // The campaign: these battles in order on a map, from the night drop over Normandy to the far side of the Rhine.
   // Each first win offers three rewards; the one you pick stays with your army for the rest of the campaign.
   // `toughness` multiplies the defenders' health in each mission, so later battles get harder.
+  // `ranks`: rank i is shown after i wins (so there is one more rank than there are missions).
   campaign: {
     name: "Road to the Rhine",
-    blurb: "Lead the U.S. Army from the beaches of Normandy all the way to the Rhine. Every victory earns a reward that makes your army stronger, and every battle is tougher than the last.",
-    ranks: ["Private", "Corporal", "Sergeant", "Lieutenant", "Captain", "Major", "Colonel", "General"],
-    toughness: [1, 1.1, 1.15, 1.25, 1.3, 1.45, 1.55],
-    missions: [
-      { level: "omaha",    x: 130, y: 107 },
-      { level: "pointe",   x: 104, y: 103 },
-      { level: "brecourt", x: 74,  y: 90 },
-      { level: "roule",    x: 54,  y: 64 },
-      { level: "crossbow", x: 242, y: 80, via: [[92, 120], [150, 126], [204, 118], [230, 96]] },
-      { level: "bastogne", x: 306, y: 128, via: [[272, 104]] },
-      { level: "remagen",  x: 350, y: 110 }
-    ],
+    blurb: "Lead the U.S. Army from the first paratroopers over Normandy all the way across the Rhine. Every victory earns a reward that makes your army stronger, and every battle is tougher than the last.",
+    finale: "You fought all the way from the night drop over Normandy, across France and Belgium and over the Rhine, and about six weeks after Operation Varsity the war in Europe was won!",
+    ranks: ["Private", "Private First Class", "Corporal", "Sergeant", "Staff Sergeant", "Technical Sergeant", "Master Sergeant", "Warrant Officer",
+            "Second Lieutenant", "First Lieutenant", "Captain", "Major", "Lieutenant Colonel", "Colonel", "Brigadier General", "Major General",
+            "Lieutenant General", "General", "General of the Army"],
+    toughness: [1, 1, 1.04, 1.08, 1.12, 1.15, 1.18, 1.22, 1.25, 1.28, 1.31, 1.35, 1.39, 1.43, 1.47, 1.51, 1.55, 1.6],
     rewards: [
       { id: "bazooka",  name: "Bazooka team",    text: "+1 Bazooka in every battle", icon: "bazooka", add: { bazooka: 1 } },
       { id: "rifles",   name: "Fresh troops",    text: "+2 Riflemen in every battle", icon: "rifleman", add: { rifleman: 2 } },
       { id: "grenades", name: "Grenade crates",  text: "+2 Grenades in every battle", icon: "grenade", add: { grenade: 2 } },
-      { id: "veterans", name: "Veteran GIs",     text: "Riflemen and paratroopers hit 40% harder", icon: "sarge", buff: { rifleman: { power: 1.4 }, para: { power: 1.4 } } },
+      { id: "veterans", name: "Veteran GIs",     text: "Riflemen and paratroopers hit 30% harder", icon: "sarge", buff: { rifleman: { power: 1.3 }, para: { power: 1.3 } } },
       { id: "mustang",  name: "Air support",     text: "+1 Mustang strike in every battle", icon: "p51", add: { p51: 1 } },
       { id: "sherman",  name: "Tank platoon",    text: "+1 Sherman tank in every battle", icon: "sherman", add: { sherman: 1 } },
-      { id: "bigguns",  name: "Big guns",        text: "+1 Howitzer in every battle", icon: "howitzer", add: { howitzer: 1 } },
-      { id: "tnt",      name: "Extra TNT",       text: "Engineers' charges blast 40% bigger", icon: "engineer", buff: { engineer: { boom: 1.4 } } },
+      { id: "bigguns",  name: "Big guns",        text: "Howitzer shells blast 25% bigger", icon: "howitzer", buff: { howitzer: { boom: 1.25 } } },
+      { id: "tnt",      name: "Extra TNT",       text: "Engineers' charges blast 25% bigger", icon: "engineer", buff: { engineer: { boom: 1.25 } } },
       { id: "airborne", name: "Airborne",        text: "+1 C-47 paratrooper drop in every battle", icon: "c47", add: { c47: 1 } },
-      { id: "jugs",     name: "Fighter-bombers", text: "+1 P-47 Thunderbolt in every battle", icon: "p47", add: { p47: 1 } },
       { id: "sarge",    name: "Big Sarge",       text: "+1 Big Sarge in every battle", icon: "sarge", add: { sarge: 1 } },
-      { id: "armor",    name: "Thicker armor",   text: "Your jeeps, halftracks and tanks are 50% tougher", icon: "halftrack", buff: { jeep: { hp: 1.5 }, halftrack: { hp: 1.5 }, sherman: { hp: 1.5 } } }
+      { id: "armor",    name: "Thicker armor",   text: "Your jeeps, halftracks and tanks are 40% tougher", icon: "halftrack",
+        buff: { jeep: { hp: 1.4 }, halftrack: { hp: 1.4 }, sherman: { hp: 1.4 }, rhino: { hp: 1.4 } } },
+      { id: "rockets",  name: "Bazooka experts", text: "Bazooka rockets blast 25% bigger", icon: "bazooka", buff: { bazooka: { boom: 1.25 } } },
+      { id: "heavymortar", name: "Heavy mortars", text: "Mortar shells blast 25% bigger", icon: "mortar", buff: { mortar: { boom: 1.25 } } },
+      { id: "pitchers", name: "Strong arms",     text: "Grenades blast 25% bigger", icon: "grenade", buff: { grenade: { boom: 1.25 } } },
+      { id: "marksmen", name: "Marksmen",        text: "Riflemen hit 30% harder", icon: "rifleman", buff: { rifleman: { power: 1.3 } } },
+      { id: "rangers",  name: "Ranger training", text: "Big Sarge and bayonet chargers hit 30% harder", icon: "bayonet_gi", buff: { sarge: { power: 1.3 }, bayonet: { power: 1.3 } } },
+      { id: "eagles",   name: "Jump school",     text: "Paratroopers and gliders hit 30% harder", icon: "para", buff: { para: { power: 1.3 }, glider: { power: 1.3 } } },
+      { id: "polecharges", name: "Pole charges", text: "Engineers hit 30% harder when they land", icon: "engineer", buff: { engineer: { power: 1.3 } } },
+      { id: "armoredinf", name: "Armored infantry", text: "Halftracks are 40% tougher and crash 30% harder", icon: "halftrack", buff: { halftrack: { hp: 1.4, power: 1.3 } } },
+      { id: "guncrews", name: "Gun crews",       text: "Mortar and Howitzer shells hit 30% harder on a direct hit", icon: "mortar", buff: { mortar: { power: 1.3 }, howitzer: { power: 1.3 } } },
+      { id: "tankaces", name: "Tank aces",       text: "Shermans and Rhino tanks crash and ram 30% harder", icon: "sherman", buff: { sherman: { power: 1.3 }, rhino: { power: 1.3 } } },
+      { id: "hunters",  name: "Tank hunters",    text: "Bazooka rockets hit 30% harder on a direct hit", icon: "bazooka", buff: { bazooka: { power: 1.3 } } }
     ],
-    // the map is 384 x 216 pixels; land is drawn from these outlines, everything else is sea
+    missions: [
+      {level: "stemere", x: 69.9, y: 159.0},
+      {level: "utah", x: 74.1, y: 158.5},
+      {level: "omaha", x: 84.2, y: 161.0, via: [[76.8, 157.9]]},
+      {level: "pointe", x: 80.3, y: 159.6},
+      {level: "brecourt", x: 72.4, y: 160.1},
+      {level: "lafiere", x: 68.5, y: 159.4},
+      {level: "carentan", x: 72.0, y: 164.1},
+      {level: "roule", x: 60.2, y: 147.7},
+      {level: "saintlo", x: 77.1, y: 173.6},
+      {level: "cobra", x: 72.3, y: 174.8},
+      {level: "crossbow", x: 179.2, y: 109.6, via: [[131.2, 169.3], [160.0, 134.5]]},
+      {level: "paris", x: 187.2, y: 186.3},
+      {level: "siegfried", x: 310.4, y: 127.0},
+      {level: "aachen", x: 306.6, y: 90.9},
+      {level: "hurtgen", x: 315.5, y: 94.6},
+      {level: "bastogne", x: 294.9, y: 129.5},
+      {level: "remagen", x: 343.4, y: 100.6},
+      {level: "varsity", x: 323.2, y: 44.8, via: [[334.7, 82.7], [328.0, 59.8]]}
+    ],
+    // each chapter is a zoom window [x0, y0, width] into the map, with its own labels; it covers missions from `start` on
+    chapters: [
+      { name: "D-Day", start: 0, view: [57.8, 148.5, 38.4],
+        labels: [{text: "English Channel", x: 81.6, y: 152.9, sea: true}, {text: "Normandy", x: 84.8, y: 168.8}],
+        cities: [{name: "Carentan", x: 72.0, y: 164.1}, {name: "Bayeux", x: 89.6, y: 165.4}] },
+      { name: "Normandy", start: 5, view: [34.5, 141.5, 68],
+        labels: [{text: "English Channel", x: 81.6, y: 149.4, sea: true}, {text: "Cotentin", x: 60.2, y: 155.4}, {text: "Normandy", x: 89.0, y: 171.3}],
+        cities: [{name: "Bayeux", x: 89.6, y: 165.4}, {name: "Coutances", x: 65.8, y: 176.9}] },
+      { name: "Liberation", start: 10, view: [125, 71, 240],
+        labels: [{text: "France", x: 220.8, y: 156.9}, {text: "Belgium", x: 257.6, y: 102.1}, {text: "Germany", x: 348.8, y: 127.0}, {text: "Luxembourg", x: 307.2, y: 148.4}],
+        cities: [{name: "Calais", x: 171.2, y: 81.7}, {name: "Brussels", x: 251.2, y: 87.1}] },
+      { name: "Into Germany", start: 14, view: [180, 30, 204],
+        labels: [{text: "Belgium", x: 270.4, y: 109.6}, {text: "Netherlands", x: 281.6, y: 54.8}, {text: "Germany", x: 360.0, y: 77.2}, {text: "Rhine", x: 356.8, y: 132.0}],
+        cities: [{name: "Liège", x: 290.2, y: 98.1}, {name: "Cologne", x: 334.7, y: 82.7}] }
+    ],
+    // the map is 384 x 216 pixels, drawn from real coordinates (x = (longitude + 3.5) * 32, y = (52.6 - latitude) * 49.8);
+    // land is drawn from these outlines, everything else is sea
     map: {
       land: [
-        { tint: "england", pts: [[0, 0], [250, 0], [250, 8], [244, 18], [240, 30], [232, 38], [222, 44], [204, 46], [186, 48], [170, 46], [150, 48],
-                                 [130, 50], [110, 48], [90, 50], [70, 52], [50, 54], [30, 56], [0, 58]] },
-        { tint: "europe", pts: [[0, 216], [0, 104], [14, 100], [26, 104], [32, 106], [34, 94], [32, 80], [30, 68], [36, 60], [46, 58], [56, 60], [66, 58],
-                                [76, 62], [80, 72], [82, 86], [86, 96], [96, 104], [110, 108], [130, 111], [150, 112], [170, 110], [186, 108], [196, 104],
-                                [204, 96], [210, 88], [216, 80], [222, 72], [228, 64], [236, 60], [248, 58], [260, 56], [270, 50], [276, 40], [282, 24],
-                                [286, 8], [288, 0], [384, 0], [384, 216]] }
+        { tint: "england", pts: [
+          [0.0, 0.0], [167.7, 0.0], [168.0, 6.0], [165.8, 13.4], [163.2, 22.4], [162.6, 25.9], [155.2, 32.4], [153.0, 32.9], [152.6, 37.3], [148.8, 40.3], [142.4, 40.8], [139.2, 43.8],
+          [142.4, 47.3], [142.4, 51.3], [135.0, 53.3], [126.4, 55.3], [136.3, 57.8], [144.6, 61.8], [148.2, 61.3], [156.2, 60.3], [158.4, 61.3], [157.4, 63.2], [156.8, 68.7], [154.2, 73.7],
+          [149.8, 75.7], [146.6, 76.2], [143.0, 84.2], [136.0, 82.7], [130.6, 87.1], [120.0, 92.6], [113.6, 90.1], [107.5, 88.6], [100.2, 89.1], [90.2, 90.6], [86.7, 93.6], [83.2, 90.6],
+          [77.4, 90.1], [69.4, 86.7], [65.6, 90.1], [62.4, 92.1], [56.0, 93.6], [49.6, 94.6], [49.6, 99.6], [45.8, 100.6], [33.6, 99.1], [33.3, 104.1], [28.8, 98.6], [17.9, 93.6],
+          [13.8, 95.1], [8.3, 96.1], [2.9, 99.1], [0.0, 102.1]] },
+        { tint: "england", pts: [[61.4, 96.1], [70.4, 91.1], [76.8, 93.6], [77.8, 95.6], [74.2, 99.6], [70.4, 100.8], [64.6, 97.6]] },
+        { tint: "europe", pts: [
+          [0.0, 216.1], [0.0, 189.7], [1.6, 188.2], [9.0, 185.8], [14.4, 189.7], [16.0, 186.8], [21.4, 196.7], [24.6, 203.2], [33.6, 197.2], [37.8, 194.7], [40.0, 197.2], [47.4, 196.7],
+          [53.1, 193.7], [52.8, 195.7], [57.6, 199.2], [63.7, 198.0], [66.6, 196.7], [63.4, 193.2], [61.8, 189.2], [60.8, 187.2], [61.8, 184.3], [61.4, 177.8], [60.8, 170.3], [60.2, 167.8],
+          [57.6, 162.8], [54.1, 160.4], [53.1, 155.4], [51.5, 152.9], [52.5, 150.4], [52.8, 147.9], [49.9, 145.9], [49.6, 143.2], [51.8, 143.4], [53.4, 144.4], [56.6, 145.2], [57.6, 145.7],
+          [60.2, 146.7], [62.1, 146.2], [65.0, 144.7], [68.8, 144.4], [71.4, 144.4], [71.7, 145.9], [72.6, 148.9], [71.7, 150.1], [71.0, 152.4], [70.7, 153.9], [72.3, 156.4], [73.6, 157.9],
+          [74.6, 159.1], [73.9, 160.9], [74.2, 162.1], [75.2, 162.6], [76.5, 163.3], [77.4, 162.1], [77.8, 160.9], [78.7, 159.9], [80.0, 159.8], [80.3, 159.4], [81.0, 159.9], [82.2, 160.1],
+          [83.2, 160.4], [84.0, 160.9], [84.8, 161.4], [86.4, 161.6], [88.0, 161.8], [92.2, 162.3], [97.3, 162.6], [100.8, 163.3], [104.0, 164.8], [108.2, 164.8], [109.8, 164.3], [114.6, 160.9],
+          [119.4, 158.4], [122.6, 157.4], [116.8, 155.9], [115.2, 154.9], [114.2, 153.4], [117.1, 145.4], [118.4, 143.9], [123.8, 141.4], [134.7, 136.0], [146.6, 133.0], [155.8, 126.5], [159.7, 120.5],
+          [163.2, 119.5], [161.9, 109.6], [162.6, 103.6], [163.2, 93.1], [162.6, 86.2], [166.7, 83.2], [171.2, 81.7], [179.8, 79.7], [187.8, 77.2], [193.6, 74.7], [205.4, 68.2], [214.4, 63.2],
+          [222.4, 60.8], [236.8, 61.8], [246.4, 61.8], [246.4, 59.8], [236.8, 58.8], [227.2, 57.8], [222.4, 53.3], [227.2, 49.8], [230.4, 48.8], [230.4, 43.8], [235.2, 42.3], [236.8, 38.3],
+          [243.8, 30.9], [248.6, 24.9], [253.4, 17.9], [257.6, 7.5], [259.8, 0.0], [384.0, 0.0], [384.0, 216.1]] },
+        { tint: "europe", pts: [[40.0, 166.8], [47.4, 167.6], [47.7, 170.3], [41.6, 170.8]] },
+        { tint: "europe", pts: [[26.6, 155.9], [31.4, 153.9], [31.7, 157.9], [28.2, 158.4]] },
+        { tint: "europe", pts: [[40.3, 143.7], [43.2, 142.9], [42.9, 144.4]] }
       ],
       rivers: [
-        { w: 2, pts: [[384, 190], [366, 160], [356, 132], [350, 112], [342, 92], [330, 70], [312, 50], [296, 36], [284, 26]] },
-        { w: 1, pts: [[196, 104], [206, 116], [214, 128], [222, 140], [230, 148]] },
-        { w: 1, pts: [[300, 196], [296, 164], [292, 138], [288, 112], [282, 88], [278, 68], [272, 52]] }
+        { w: 2, pts: [[122.6, 157.4], [129.6, 157.9], [137.6, 159.4], [146.9, 157.4], [152.0, 164.3], [159.4, 174.8], [167.0, 179.8], [176.0, 181.8], [187.2, 186.3], [195.2, 194.2], [197.1, 202.2], [208.0, 209.2],
+          [217.6, 216.1]] },
+        { w: 1, pts: [[163.2, 119.5], [170.6, 124.5], [185.6, 134.5], [205.8, 133.0]] },
+        { w: 2, pts: [[291.2, 216.1], [291.2, 191.2], [284.2, 171.3], [270.1, 144.4], [263.0, 140.9], [266.6, 122.5], [269.1, 116.5], [267.8, 106.1], [279.7, 103.6], [290.2, 98.1], [294.1, 87.1], [303.4, 70.2],
+          [309.4, 61.3], [302.4, 44.8], [288.0, 41.8], [272.0, 40.8], [256.0, 42.3], [246.4, 43.8]] },
+        { w: 2, pts: [[360.0, 216.1], [361.6, 200.2], [371.2, 184.3], [379.2, 179.3], [382.4, 164.3], [382.7, 154.9], [379.8, 147.9], [376.6, 129.5], [364.8, 131.0], [358.4, 122.0], [355.2, 111.6], [348.8, 107.6],
+          [343.4, 100.6], [339.2, 93.1], [334.7, 82.7], [328.6, 68.2], [328.0, 58.3], [323.8, 46.8], [312.0, 38.3], [299.8, 36.9], [284.8, 36.9], [268.8, 36.9], [255.4, 33.9], [243.8, 30.9]] },
+        { w: 1, pts: [[355.2, 111.6], [341.4, 122.0], [338.2, 133.5], [324.5, 141.9], [315.8, 155.9], [309.4, 161.4], [309.8, 173.3], [308.8, 194.2], [313.6, 216.1]] },
+        { w: 1, pts: [[74.2, 162.1], [73.3, 162.8], [72.0, 164.1], [70.4, 162.8], [69.4, 161.8], [66.6, 160.9], [63.0, 159.9], [61.4, 156.9]] },
+        { w: 1, pts: [[69.4, 161.8], [69.1, 160.4], [68.5, 159.4], [67.8, 157.4], [66.6, 154.4]] },
+        { w: 1, pts: [[76.5, 163.3], [76.2, 166.8], [76.8, 170.8], [77.1, 173.6], [77.8, 179.3], [80.0, 184.3], [81.6, 189.2]] }
       ],
-      forests: [{ x: 306, y: 128, rx: 20, ry: 12 }],
-      cities: [{ name: "Paris", x: 232, y: 150 }, { name: "London", x: 196, y: 24 }],
-      labels: [{ text: "England", x: 110, y: 24 }, { text: "English Channel", x: 150, y: 78, sea: true }, { text: "France", x: 150, y: 176 },
-               { text: "Belgium", x: 304, y: 98 }, { text: "Germany", x: 360, y: 56 }]
+      forests: [{x: 291.2, y: 127.0, rx: 18, ry: 14}, {x: 315.8, y: 95.6, rx: 4, ry: 4}, {x: 320.6, y: 45.3, rx: 2, ry: 2}],
+      cities: [{name: "London", x: 107.8, y: 54.8}, {name: "Paris", x: 187.2, y: 186.3}, {name: "Brussels", x: 251.2, y: 87.1}],
+      labels: [{text: "England", x: 60.8, y: 32.4}, {text: "North Sea", x: 198.4, y: 22.4, sea: true}, {text: "English Channel", x: 80.0, y: 118.5, sea: true}, {text: "France", x: 144.0, y: 191.7}, {text: "Belgium", x: 259.2, y: 102.1}, {text: "Netherlands", x: 288.0, y: 22.4}, {text: "Germany", x: 348.8, y: 52.3}]
     }
   },
 
   levels: [
+    {
+      id: "stemere", name: "Sainte-M\u00e8re-\u00c9glise", date: "June 5\u20136, 1944", theme: "night",
+      history: "On the night before D-Day, thousands of paratroopers of the 82nd Airborne Division jumped into the dark over Normandy. One of them, Private John Steele, got his parachute caught on the church steeple of Sainte-M\u00e8re-\u00c9glise and hung there! By morning the paratroopers had taken the town, one of the very first in France to be freed.",
+      tip: "Pop a paratrooper's chute right above a German soldier and he lands on top of him. Grenades bounce, so roll them into the houses.",
+      fortX: 400,
+      fort: [
+        "........Q.......",
+        ".......oQ.......",
+        ".......===......",
+        ".......Q.Q...~~~",
+        "Y.Y....Q.Q...W.W",
+        "YgY....QgQ...WgW"
+      ],
+      arsenal: { rifleman: 4, para: 3, grenade: 2, mortar: 1, c47: 2 },
+      wind: 1, stars: [11000, 16000]
+    },
+    {
+      id: "utah", name: "Utah Beach", date: "June 6, 1944", theme: "dawn", width: 800,
+      history: "At dawn on D-Day, soldiers of the 4th Infantry Division landed on Utah Beach. Strong currents pushed their boats more than a mile south of the planned spot, so Brigadier General Theodore Roosevelt Jr. looked around and said: \u201cWe'll start the war from right here!\u201d Fewer German guns guarded that stretch of sand, and Utah became the easiest of the D-Day beaches.",
+      tip: "The Sherman's gun cracks concrete. Lob a mortar shell over the sandbags onto the MG 42 nest.",
+      fortX: 470,
+      fort: [
+        "......o......",
+        "....=====....",
+        "....C...C..S.",
+        "Sm-SC.g.CJgS."
+      ],
+      extras: [{ type: "hedgehog", x: 300 }, { type: "hedgehog", x: 350 }, { type: "hedgehog", x: 400 }, { type: "wire", x: 444 }],
+      arsenal: { rifleman: 4, engineer: 1, grenade: 2, mortar: 2, sherman: 1, jeep: 1 },
+      wind: 2
+    },
     {
       id: "omaha", name: "Omaha Beach", date: "June 6, 1944", theme: "beach",
       history: "On D-Day, American soldiers landed on Omaha Beach in Normandy, France. They had to get past steel obstacles, barbed wire and German bunkers on the bluffs above the sand.",
@@ -221,6 +382,37 @@
       wind: 2
     },
     {
+      id: "lafiere", name: "La Fi\u00e8re Causeway", date: "June 6\u20139, 1944", theme: "marsh", width: 900,
+      history: "Paratroopers of the 82nd Airborne fought to hold the stone bridge at La Fi\u00e8re and the long causeway across the flooded Merderet River. When German tanks (small French-made ones the Germans had captured) rolled toward the bridge, a bazooka team with Private Marcus Heim knocked out the leading tanks. After three days, the airborne soldiers charged across the causeway and opened the road west.",
+      tip: "Bazookas are best against tanks, and the tanks fire at anything with wheels. Knock a tank off the bridge and it splashes into the river!",
+      fortX: 330,
+      trenches: [{ x: 330, w: 176, d: 40, water: true }],
+      fort: [
+        "........l-...........o.....",
+        "===========.........^^^....",
+        "...C...C....S..S....Q.Q....",
+        "...C...C....Sm-S.l-.QgQ.gS."
+      ],
+      arsenal: { rifleman: 3, para: 2, grenade: 2, bazooka: 3, mortar: 2, jeep: 1 },
+      wind: 2
+    },
+    {
+      id: "carentan", name: "Carentan", date: "June 10\u201312, 1944", theme: "town", width: 900,
+      history: "To join up the troops from Utah and Omaha beaches, the 101st Airborne had to capture the town of Carentan, at the end of a long causeway across flooded fields. Lieutenant Colonel Robert Cole led his paratroopers in a bayonet charge on a farm full of German soldiers beside the causeway, and he was awarded the Medal of Honor. The next day, Carentan was free.",
+      tip: "Tap the Bayonet charge in mid-air to rush forward and run right through a soldier. The MG 42s knock troops out of the air as they fly past, so take those out first.",
+      fortX: 380,
+      trenches: [{ x: 300, w: 64, d: 24, water: true }, { x: 636, w: 48, d: 24, water: true }],
+      fort: [
+        ".........................m-.",
+        "...........n............====",
+        "..........^^^.......^^^.Q..Q",
+        ".....Y..Y.Q.Q...~~~.W.W.Q..Q",
+        ".....Ym-Y.QgQ....W..WgW.Qo.Q"
+      ],
+      arsenal: { rifleman: 2, para: 2, bayonet: 3, engineer: 1, grenade: 3, mortar: 2, howitzer: 1 },
+      wind: 2
+    },
+    {
       id: "roule", name: "Fort du Roule", date: "June 25, 1944", theme: "cliff", width: 1000,
       history: "To capture the port of Cherbourg, American soldiers had to take Fort du Roule, a German fort dug into a rocky hill high above the harbor. Battleships out at sea fired on the city's guns, and Corporal John Kelly crawled up the hill to blow open a bunker with pole charges.",
       tip: "The Flak 88 shoots down planes, but it can't stop the naval guns. Save the engineers for the concrete bunkers.",
@@ -237,6 +429,36 @@
       wind: 3
     },
     {
+      id: "saintlo", name: "Saint-L\u00f4", date: "July 18, 1944", theme: "ruins", width: 950,
+      history: "For weeks, American soldiers fought through Normandy's hedgerows, tall walls of earth and bushes around every little field, to reach Saint-L\u00f4, the town where the main roads met. When the 29th Infantry Division finally took it on July 18, so much of it had been knocked down that it was later called \u201cthe capital of the ruins.\u201d",
+      tip: "The MG 42 nests hide behind hedgerows and rubble. Lob mortar shells over them, and save the engineers for the stone walls.",
+      fortX: 420,
+      fort: [
+        ".................C.......",
+        ".......Qn........Cn......",
+        ".......===.......===.....",
+        "YY..Y..Q.Q.......C.C....S",
+        "YYm-Yg.QgQ..Cm-C.CoC..SgS"
+      ],
+      craters: [{ x: 300, r: 14 }, { x: 370, r: 10 }, { x: 640, r: 12 }],
+      arsenal: { rifleman: 4, para: 1, engineer: 2, grenade: 3, mortar: 2, sherman: 1, p47: 1 },
+      wind: 2
+    },
+    {
+      id: "cobra", name: "Operation Cobra", date: "July 25, 1944", theme: "dust", width: 1050,
+      history: "After weeks stuck in the hedgerows, the Americans launched Operation Cobra. Hundreds of bombers pounded a short stretch of the German line, then tanks and troops broke through and raced south. Many Shermans had steel teeth welded on the front, an idea credited to Sergeant Curtis Culin and made from the Germans' own beach obstacles, so these \u201cRhino\u201d tanks could cut right through the hedgerows.",
+      tip: "The 105 mm guns fire at tanks, and the Flak 88s shoot down the Flying Fortress. Send the low-flying Thunderbolt at the flak first, then let the Rhinos ram through the hedgerows.",
+      fortX: 440,
+      fort: [
+        ".........YY.......................",
+        "YY.......YY............YY.....S...",
+        "YYh-g....YYm-g..f--JJ..YYh-om-Sf--"
+      ],
+      craters: [{ x: 250, r: 14 }, { x: 330, r: 10 }, { x: 560, r: 12 }, { x: 690, r: 16 }, { x: 960, r: 12 }],
+      arsenal: { rifleman: 3, engineer: 1, bazooka: 1, mortar: 2, sherman: 1, rhino: 2, p47: 1, b17: 1 },
+      wind: 2
+    },
+    {
       id: "crossbow", name: "Operation Crossbow", date: "Summer 1944", theme: "normandy", width: 1000,
       history: "Germany hid launch ramps for V-1 \u201cbuzz bombs\u201d in the woods of northern France and aimed them at London. The U.S. Army Air Forces and Britain's Royal Air Force hunted the ramps down from the sky in a campaign called Operation Crossbow. Fighter-bombers swooped in low and fast to dodge the big flak guns.",
       tip: "An Air Force mission: everything you have can fly! Fighters sneak under the flak, so use them to knock out the Flak 88s, then send in the bombers.",
@@ -249,6 +471,68 @@
       ],
       airOnly: true,
       arsenal: { p51s: 2, p47: 2, rockets: 2, b26: 2, b17: 1 },
+      wind: 1
+    },
+    {
+      id: "paris", name: "Liberation of Paris", date: "August 25, 1944", theme: "paris", width: 850,
+      history: "In August 1944, the people of Paris rose up against the German soldiers holding their city. The French 2nd Armored Division under General Leclerc rolled in first, with the U.S. 4th Infantry Division right behind, and on August 25 the German commander surrendered. Paris was saved instead of destroyed, and huge crowds cheered in the streets.",
+      tip: "The Panzerfaust soldier behind the barricade fires at vehicles. Take him out before you send the Shermans down the street.",
+      fortX: 430,
+      fort: [
+        ".....^^^^...........",
+        ".....C.nC...........",
+        ".....C..C....g......",
+        ".....====..^^^^.....",
+        "S..S.C..C..Q..Q..S..",
+        "Sm-S.Cg.C..Qo.Q.SpSg"
+      ],
+      arsenal: { rifleman: 4, sarge: 1, grenade: 2, bazooka: 1, mortar: 2, halftrack: 1, sherman: 2 },
+      wind: 1
+    },
+    {
+      id: "siegfried", name: "Siegfried Line", date: "September 1944", theme: "westwall", width: 950,
+      history: "By September 1944, the Americans had reached the Siegfried Line on Germany's border: rows of concrete \u201cdragon's teeth\u201d to stop tanks, with pillboxes hidden behind them. On September 11, a small patrol became the first American soldiers to cross into Germany.",
+      tip: "Tanks can't get past the dragon's teeth. Blow a gap with the engineers, or fly your troops right over them.",
+      fortX: 380,
+      fort: [
+        ".............g.......on.....",
+        "...........====....====.....",
+        ".D.D.D.....C..C....C..C.S.S.",
+        "DDDDDDD.XX.Cm-C.Sh-Cm-C.SgS."
+      ],
+      arsenal: { rifleman: 2, engineer: 3, sarge: 1, grenade: 2, bazooka: 2, mortar: 2, howitzer: 2, sherman: 1 },
+      wind: 2
+    },
+    {
+      id: "aachen", name: "Aachen", date: "October 21, 1944", theme: "aachen", width: 850,
+      history: "Aachen was the first German city captured by the Allies. Soldiers of the 1st Infantry Division fought through it one building at a time, and they even rolled a huge 155 mm gun up the streets to blast holes in the thick walls. The city surrendered on October 21, 1944.",
+      tip: "Panzerfaust soldiers fire at vehicles, so clear the street first. The Howitzer is great for blasting the tall buildings.",
+      fortX: 470,
+      fort: [
+        ".....n......B.n.",
+        "....====...=====",
+        "....C..C...B.g.B",
+        "....Cm-C...B...B",
+        "....====...=====",
+        "S.S.C..C...B...B",
+        "SpS.Cg.C.pSBg.oB"
+      ],
+      arsenal: { rifleman: 3, sarge: 1, engineer: 2, grenade: 2, bazooka: 1, mortar: 1, howitzer: 2, halftrack: 1, sherman: 1 },
+      wind: 2
+    },
+    {
+      id: "hurtgen", name: "H\u00fcrtgen Forest", date: "November 1944", theme: "forest", width: 1000,
+      history: "The H\u00fcrtgen Forest was a dark, thick pine forest on Germany's border, full of hidden log bunkers. In the cold autumn rain and deep mud, tanks could barely move, and American soldiers fought there for months in one of the hardest battles of the war.",
+      tip: "Snipers and MG 42s hide in log bunkers among the trees. Mortars drop right onto the bunker roofs, and the muddy ditches can trap your tank.",
+      fortX: 380,
+      trenches: [{ x: 330, w: 32, d: 20 }, { x: 620, w: 32, d: 20 }],
+      fort: [
+        "...YY..n...........Yn.......",
+        "..~~~~.W..........~~~~......",
+        "..W..W.W...Y......W..W....Y.",
+        "..Wm-W.WYg.Yg.....Wm-W.h-oYg"
+      ],
+      arsenal: { rifleman: 3, engineer: 2, sarge: 1, grenade: 3, bazooka: 1, mortar: 2, howitzer: 1, sherman: 1 },
       wind: 1
     },
     {
@@ -280,6 +564,21 @@
         ".....C....C...CCJ...Sm-S...Sgf--.S.o"
       ],
       arsenal: { rifleman: 3, sarge: 1, engineer: 2, grenade: 2, bazooka: 2, mortar: 1, halftrack: 1, sherman: 1, p51: 1 },
+      wind: 2
+    },
+    {
+      id: "varsity", name: "Operation Varsity", date: "March 24, 1945", theme: "spring", width: 1050,
+      history: "In Operation Varsity, thousands of planes and gliders carried American and British airborne soldiers across the Rhine River in a single morning. They landed right on top of the German positions near the town of Wesel, the biggest airborne drop ever made in one day, and soon joined up with the troops crossing the river in boats.",
+      tip: "Snipers shoot down parachutes and flak guns shoot down high-flying planes. Knock them out with gliders and the low-flying Thunderbolt before the big drops.",
+      fortX: 470,
+      trenches: [{ x: 190, w: 150, d: 40, water: true }],
+      fort: [
+        "......n.............n......",
+        ".....^^^^..........YW......",
+        "...S.Q..Q...S....S.YW.....S",
+        "f--S.Qg.Qgm-S.f--S.YW.h-ogS"
+      ],
+      arsenal: { rifleman: 2, para: 3, glider: 2, grenade: 1, mortar: 1, c47: 1, p47: 1, b26: 1 },
       wind: 2
     }
   ]

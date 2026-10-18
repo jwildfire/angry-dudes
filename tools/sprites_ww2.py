@@ -222,8 +222,8 @@ def jeep():
     return g.outline()
 
 
-def sherman():
-    g = Grid(46, 28)
+def sherman(prongs=False):
+    g = Grid(52 if prongs else 46, 28)
     g.rect(4, 21, 38, 6, "x")
     g.rect(3, 22, 1, 4, "x")
     g.rect(42, 22, 1, 4, "x")
@@ -242,6 +242,52 @@ def sherman():
     g.rect(43, 9, 1, 4, "x")
     g.stamp(MINI_HEAD, 16, 1)
     g.stamp(US_STAR, 12, 15)
+    if prongs:
+        # Sgt. Culin's hedgerow cutter: steel teeth cut from German beach obstacles, welded to the bow
+        g.rect(43, 19, 2, 6, "G")
+        for y in (19, 22, 25):
+            g.rect(45, y, 4, 1, "g")
+            g.px(49, y, "l")
+        g.rect(45, 20, 3, 1, "G")
+        g.rect(45, 23, 3, 1, "G")
+    return g.outline()
+
+
+def rhino():
+    return sherman(prongs=True)
+
+
+def bayonet_gi():
+    """Paratrooper charging with his bayonet fixed."""
+    g = Grid(22, 17)
+    g.stamp(US_HELMET + face("shout") + PARA_BODY, 0, 0)
+    g.rect(6, 14, 12, 1, "b")
+    g.rect(9, 13, 8, 1, "x")
+    g.rect(18, 14, 3, 1, "l")
+    g.px(21, 14, "w")
+    return g.outline()
+
+
+def glider():
+    """Waco CG-4A glider: a boxy canvas fuselage, a big high wing and a glass nose. No engine!"""
+    g = Grid(40, 14)
+    for y in range(0, 7):
+        g.rect(2, y, 3 + y // 2, 1, "a")    # tail fin
+    g.rect(2, 7, 6, 2, "a")
+    g.line(6, 8, 26, 6, "a", 2)             # thin tail boom
+    g.rect(22, 4, 14, 7, "a")               # boxy cabin
+    g.rect(22, 4, 14, 1, "e")
+    g.rect(36, 5, 2, 5, "a")
+    g.rect(35, 5, 3, 3, "v")                # glass nose
+    g.px(36, 5, "w")
+    for x in (25, 28, 31):
+        g.px(x, 7, "v")
+    g.rect(14, 2, 24, 2, "A")               # high wing
+    g.rect(14, 2, 24, 1, "e")
+    g.disc(25, 8, 1, "U")
+    g.rect(24, 8, 3, 1, "w")
+    g.rect(27, 11, 1, 2, "x")               # landing skid
+    g.rect(24, 12, 8, 1, "x")
     return g.outline()
 
 
@@ -394,7 +440,67 @@ def tiger():
     return g.outline().mirror()
 
 
+def r35():
+    """A small French-made tank the Germans had captured: tall cast turret, short gun, plain black cross."""
+    g = Grid(38, 24)
+    g.rect(3, 16, 30, 6, "x")
+    g.rect(2, 17, 1, 4, "x")
+    g.rect(33, 17, 1, 4, "x")
+    for cx in (7, 12, 17, 22, 27):
+        g.disc(cx, 19, 2, "G")
+        g.px(cx, 19, "g")
+    g.disc(31, 18, 2, "G")
+    g.rect(4, 10, 28, 6, "d")
+    g.line(28, 10, 33, 15, "d", 2)          # sloped bow
+    g.rect(4, 10, 25, 1, "E")
+    g.rect(1, 12, 4, 4, "d")                # raised engine deck at the back
+    g.rect(12, 3, 11, 7, "d")               # tall cast turret
+    g.rect(13, 2, 9, 1, "d")
+    g.rect(13, 3, 9, 1, "E")
+    g.rect(15, 0, 4, 2, "D")                # cupola
+    g.rect(23, 6, 7, 2, "x")                # short gun
+    g.rect(16, 5, 4, 1, "k")
+    for x0, y0, x1, y1, c in ((5, 11, 9, 15, "J"), (24, 11, 28, 15, "j")):
+        g.line(x0, y0, x1, y1, c, 1, only="dE")
+    g.stamp(BALKENKREUZ, 6, 9)
+    return g.outline().mirror()
+
+
+def panzerfaust():
+    """German soldier with a Panzerfaust, a one-shot anti-tank rocket tube, over his shoulder."""
+    g = Grid(18, 17)
+    g.stamp(DE_HELMET + face(stahl=True) + DE_BODY, 2, 0)
+    g.rect(4, 14, 14, 2, "A")
+    g.rect(0, 13, 4, 4, "D")
+    g.rect(0, 13, 4, 1, "d")
+    g.px(17, 14, "x")
+    return g.outline()
+
+
+def proj_pzf():
+    g = Grid(12, 7)
+    g.rect(1, 3, 6, 1, "A")
+    g.rect(7, 1, 3, 5, "D")
+    g.rect(7, 1, 3, 1, "d")
+    g.px(10, 3, "D")
+    g.rect(1, 2, 1, 3, "x")
+    return g.outline()
+
+
 # -------------------------------------------------------------- fort pieces
+def dragons_tooth():
+    """'Dragon's teeth': a concrete pyramid of the Siegfried Line, built to stop tanks."""
+    g = Grid(16, 16)
+    for y in range(2, 16):
+        half = 2 + (y - 2) * 6 // 13
+        g.rect(8 - half, y, half, 1, "i")
+        g.rect(8, y, half, 1, "P")
+        g.px(8 - half, y, "p")
+    g.rect(6, 1, 4, 1, "i")
+    g.rect(1, 15, 14, 1, "P")
+    for x, y in ((5, 7), (10, 9), (4, 12), (11, 13), (7, 10)):
+        g.px(x, y, "p")
+    return g.outline()
 def concrete():
     g = Grid(16, 16)
     g.rect(0, 0, 16, 16, "k")
@@ -520,6 +626,9 @@ def build():
     add("howitzer", howitzer(), "allies")
     add("jeep", jeep(), "allies")
     add("sherman", sherman(), "allies")
+    add("rhino", rhino(), "allies")
+    add("bayonet_gi", bayonet_gi(), "allies")
+    add("glider", glider(), "allies")
     add("p51", mustang(), "allies", air=True)
     add("b17", flying_fortress(), "allies", air=True)
 
@@ -529,11 +638,15 @@ def build():
     add("officer", officer(), "axis")
     add("flak88", flak88(), "axis")
     add("tiger", tiger(), "axis")
+    add("lighttank", r35(), "axis")
+    add("panzerfaust", panzerfaust(), "axis")
+    add("proj_pzf", proj_pzf(), "axis")
 
     add("concrete", concrete())
     add("hedgehog", hedgehog())
     add("wire", barbed_wire())
     add("jerrycan", jerrycan())
+    add("dragonstooth", dragons_tooth())
 
 
 
