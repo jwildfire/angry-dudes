@@ -58,6 +58,35 @@ only the plain black cross that was painted on them. There's no poison gas in Wo
 helmets have no horns (those were invented in the 1800s). The history blurbs stick to things historians
 agree on and leave out famous legends.
 
+## Level Builder
+
+Every war has a **Level Builder** button on the main menu. Press **New level**, then tap the battlefield:
+
+- Pick a piece from the bar at the bottom (sandbags, concrete, slabs, defenders, balloons…) and tap where it
+  should go. It drops on top of whatever is already there. Tap in an empty room under a roof and it goes in
+  the room instead. Two slabs side by side join up, so roofs and bridges grow sideways.
+- **Erase** takes a piece away. **Trench**, **River** and **Hill** change the ground. **Undo** takes back the
+  last change, and **Surprise me** builds a whole fort to start from.
+- **Setup** sets the name, the size of the battlefield, the scenery, the wind and your arsenal (it suggests a
+  fair number of items for the defenders you placed).
+- **Test it!** plays the level. When the battle ends you go straight back to the builder.
+
+Levels are saved in the browser, under **My levels**. **Share** turns a level into a code and a link; a friend
+pastes the code into **Paste a code** in their own Level Builder, or just opens the link.
+
+## Fortress Battle
+
+**Fortress Battle** (also on the main menu) gives you a fortress of your own. Build it with the Level Builder
+(40 coins of blocks, and up to 5 of your own soldiers to guard it), or press **Quick battle** for a ready-made
+one. The enemy's fort is on the far right. You take turns: you fire at their fort, then they fire back at
+yours. Your shots fly straight through your own fortress (and theirs through theirs). Knock out all their
+defenders before they knock out all your soldiers; every soldier still standing at the end is worth bonus
+points and stars.
+
+The enemy aims for real. On **Easy** it's a bad shot with a small fort; on **Normal** some of its defenders
+fight back; on **Hard** it hardly ever misses, its defenders are 25% tougher and it uses its biggest guns.
+**New enemy fort** after a battle builds a different fort to fight. Your fortress is saved for each war.
+
 ## The World War II campaign
 
 The World War II tab has a **Campaign: Road to the Rhine** button. It opens a map of Normandy, Belgium and

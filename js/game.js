@@ -2176,7 +2176,7 @@
       build = null; fortress.mine = d.fort.slice(); openIntro(-1, fortressLevel()); return;
     }
     if (!n.foes) { buildMsg("Put at least one defender in the fort first!"); return; }
-    if (!n.items) { openSetup(); return; }
+    if (!n.items) { d.arsenal = autoArsenal(d); saveDraft(d); updateBuildTop(); openSetup(); setText("setup-title", "Pick your arsenal, then test it!"); return; }
     playDraft(d, true);
   }
   function playDraft(d, editing) {
@@ -2228,12 +2228,21 @@
   }
   function openSetup() {
     if (!build) return;
+    setText("setup-title", "Battle setup");
     renderSetup(); show("build-setup");
     $("setup-name").value = build.draft.name;
   }
   function renderSetup() {
     var d = build.draft, n = countPieces(d), sugg = Math.max(4, Math.round(n.foes * 0.75) + n.fighters + 2);
-    segButtons("setup-size", SIZES, function (z) { return z.w === d.width; }, function (z) { snapshot(); d.width = z.w; rebuild(); renderSetup(); });
+    segButtons("setup-size", SIZES, function (z) { return z.w === d.width; }, function (z) {
+      // a smaller battlefield loses whatever no longer fits
+      snapshot(); d.width = z.w;
+      var cols = zoneCols(d);
+      setGrid(d, gridOf(d)); d.ground = (d.ground || "").slice(0, cols);
+      if (d.hill > cols - 2) d.hill = -1;
+      d.floaters = (d.floaters || []).filter(function (f) { return f.c < cols - 1; });
+      rebuild(); renderSetup();
+    });
     segButtons("setup-scene", Object.keys(THEMES).map(function (k) { return { name: cap(k), k: k }; }), function (t) { return t.k === d.theme; },
       function (t) { snapshot(); d.theme = t.k; rebuild(); renderSetup(); });
     segButtons("setup-wind", WINDS, function (w) { return w.v === d.wind; }, function (w) { snapshot(); d.wind = w.v; rebuild(); renderSetup(); });

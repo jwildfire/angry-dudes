@@ -15,7 +15,9 @@ first win, and defenders that get tougher mission by mission. Best scores and ca
 are saved on the phone, and after two losses in a row a battle starts with one bonus troop, like
 the prototype.
 
-Not yet: sound, haptics and iPad.
+Not yet: sound, haptics and iPad, the Level Builder and Fortress Battle modes, and some newer campaign map
+features (the app shows every mission on the campaign's overall map, without chapter zooms, front lines
+or skylines in the battle backgrounds).
 
 ## Run it
 
