@@ -26,6 +26,7 @@
   var MAX_PULL = 50, MAX_SPEED = 24, PULL_CSS = 110;
   var OUTLINE = "#1d1a2b";
   var WATER = 0x0004, BOAT = 0x0008;          // collision categories: only boats float on water
+  var MINE = 0x0010, THEIRS = 0x0020;         // fortress battles: each side's shots fly through its own fort
   var KIND_LABEL = { sling: "Sling", fire: "Fire", drive: "Drive", air: "Call in" };
 
   /* ------------------------------------------------------------- helpers */
@@ -131,10 +132,10 @@
   function play(name, arg) { if (sfx[name]) sfx[name](arg); }
 
   /* --------------------------------------------------------------- state */
-  var pack = null, packIndex = 0, UNITS = {}, ORDER = [], BLOCKS = {}, DEFENDERS = {}, BY_KEY = {}, THEMES = {};
+  var pack = null, packIndex = 0, UNITS = {}, ORDER = [], BLOCKS = {}, DEFENDERS = {}, BY_KEY = {}, THEMES = {}, ALLIES = {};
   var engine = null, world = null, level = null, levelIndex = 0, worldW = WORLD_W;
-  var mode = "menu";        // menu | intro | play | result
-  var phase = "ready";      // ready | aiming | active | settling | over
+  var mode = "menu";        // menu | intro | play | result | campaign | build
+  var phase = "ready";      // ready | aiming | active | settling | enemy (their turn in a fortress battle) | over
   var ents = [], planes = [], particles = [], popups = [], tracers = [], pendingBooms = [], scheduled = [];
   var arsenal = {}, selected = null, score = 0, wind = 0, simT = 0, graceUntil = 0, shake = 0;
   var active = null, aim = null, trail = [], lastTrail = [];
@@ -149,6 +150,12 @@
     BY_KEY = {};
     Object.keys(BLOCKS).forEach(function (c) { if (!BLOCKS[c].slab) BY_KEY[BLOCKS[c].key] = c; });
     Object.keys(DEFENDERS).forEach(function (c) { BY_KEY[DEFENDERS[c].key] = c; });
+    // in a fortress battle your own fort is guarded by your troops, drawn with the digits 1-4
+    ALLIES = {};
+    ORDER.filter(function (k) { return UNITS[k].kind === "sling"; }).slice(0, 4).forEach(function (k, i) {
+      var u = UNITS[k];
+      ALLIES[String(i + 1)] = { key: k, name: u.name, sprite: u.sprite, w: u.w, h: u.h, hp: u.w >= 16 ? 4 : 2.5, density: 0.002, pts: 0 };
+    });
     store("angrydudes.pack", pack.id);
   }
   function nameOf(key) {
@@ -158,8 +165,9 @@
   }
 
   /* --------------------------------------------------------------- level */
-  function loadLevel(i) {
-    levelIndex = i; level = pack.levels[i]; worldW = level.width || WORLD_W;
+  // loadLevel(i) loads the pack's level i; loadLevel(-1, L) loads a level made elsewhere (the builder, a fortress battle)
+  function loadLevel(i, L) {
+    levelIndex = L ? -1 : i; level = L || pack.levels[i]; worldW = level.width || WORLD_W;
     UNITS = campaign ? campaignUnits() : pack.units;
     camX = 0; camHoldX = null; camHoldUntil = 0; gesture = null;
     engine = Engine.create({ enableSleeping: true, positionIterations: 10, velocityIterations: 8 });
@@ -187,41 +195,17 @@
         { isStatic: true, friction: 0.9, label: "cliff" }));
     }
 
-    // Each column stacks on whatever is already below it, so towers, gates and huts can sit side by side.
-    // every column starts on whatever is under it: open ground, a trench floor or a cliff top
-    var rows = level.fort, cols = [];
-    rows.forEach(function (row) { for (var c = 0; c < row.length; c++) cols[c] = groundAt(level.fortX + c * 16 + 8); });
-    function topOf(c, n) { var t = Infinity; for (var k = c; k < c + n; k++) t = Math.min(t, cols[k]); return t; }
-    for (var r = rows.length - 1; r >= 0; r--) {
-      var row = rows[r];
-      for (var c = 0; c < row.length; c++) {
-        var ch = row[c], x = level.fortX + c * 16, n, top, k, sh;
-        if (ch === "." || ch === "-") continue;
-        if (BLOCKS[ch] && BLOCKS[ch].slab) {
-          n = 1; while (row[c + n] === ch) n++;
-          top = topOf(c, n); sh = BLOCKS[ch].h || 8;
-          if (BLOCKS[ch].boat) top = Math.min(top, GROUND);     // a ship's hull floats on the water
-          addBlock(ch, x + n * 8, top, n * 16, sh);
-          for (k = c; k < c + n; k++) cols[k] = top - sh;
-          c += n - 1;
-        } else if (BLOCKS[ch]) {
-          if (BLOCKS[ch].boat) cols[c] = Math.min(cols[c], GROUND);
-          addBlock(ch, x + 8, cols[c]); cols[c] -= BLOCKS[ch].h || 16;
-        } else if (DEFENDERS[ch]) {
-          n = DEFENDERS[ch].cells || 1; top = topOf(c, n);
-          addDefender(ch, x + n * 8, top);
-          for (k = c; k < c + n; k++) cols[k] = top - 16;
-        }
-      }
-    }
-    (level.extras || []).forEach(function (ex) {
-      var ch = BY_KEY[ex.type];
+    buildFort(level.fort, level.fortX, null);
+    if (level.myFort) buildFort(level.myFort, level.myFortX, "mine");
+    (level.extras || []).forEach(function (ex, n) {
+      var ch = BY_KEY[ex.type], e = null;
       var at = groundAt(ex.x) - (ex.alt || 0);
-      if (BLOCKS[ch]) addBlock(ch, ex.x, at); else if (DEFENDERS[ch]) addDefender(ch, ex.x, at);
+      if (BLOCKS[ch]) e = addBlock(ch, ex.x, at); else if (DEFENDERS[ch]) e = addDefender(ch, ex.x, at);
+      if (e) e.extra = n;
     });
 
     // in a campaign, every mission's defenders are tougher than the last
-    var tough = campaign ? campaign.C.toughness[campaign.i] || 1 : 1;
+    var tough = campaign ? campaign.C.toughness[campaign.i] || 1 : level.toughness || 1;
     if (tough !== 1) ents.forEach(function (e) { if (e.type === "defender") { e.hp *= tough; e.maxHp *= tough; } });
     arsenal = {};
     var issued = campaign ? campaignArsenal(level) : level.arsenal;
@@ -242,8 +226,44 @@
       if (extraTroop) arsenal[extraTroop]++;
     }
     selected = firstAvailable();
+    if (level.fortress && fortress) { fortress.turn = "me"; fortress.soldiers = allies().length; }
     newWind();
     buildBackground(); buildBar(); updateHud();
+  }
+  // Each column stacks on whatever is already below it, so towers, gates and huts can sit side by side.
+  // Every column starts on whatever is under it: open ground, a trench floor or a cliff top.
+  // side "mine" is your own fortress in a fortress battle; each piece remembers its cell for the level builder.
+  function buildFort(rows, fx, side) {
+    var cols = [];
+    rows.forEach(function (row) { for (var c = 0; c < row.length; c++) cols[c] = groundAt(fx + c * 16 + 8); });
+    function topOf(c, n) { var t = Infinity; for (var k = c; k < c + n; k++) t = Math.min(t, cols[k]); return t; }
+    for (var r = rows.length - 1; r >= 0; r--) {
+      var row = rows[r];
+      for (var c = 0; c < row.length; c++) {
+        var ch = row[c], x = fx + c * 16, n = 1, top, k, sh, e = null;
+        if (ch === "." || ch === "-") continue;
+        if (side === "mine" && ALLIES[ch]) {
+          e = addAlly(ch, x + 8, cols[c]); cols[c] -= 16;
+        } else if (BLOCKS[ch] && BLOCKS[ch].slab) {
+          while (row[c + n] === ch) n++;
+          top = topOf(c, n); sh = BLOCKS[ch].h || 8;
+          if (BLOCKS[ch].boat) top = Math.min(top, GROUND);     // a ship's hull floats on the water
+          e = addBlock(ch, x + n * 8, top, n * 16, sh);
+          for (k = c; k < c + n; k++) cols[k] = top - sh;
+        } else if (BLOCKS[ch]) {
+          if (BLOCKS[ch].boat) cols[c] = Math.min(cols[c], GROUND);
+          e = addBlock(ch, x + 8, cols[c]); cols[c] -= BLOCKS[ch].h || 16;
+        } else if (DEFENDERS[ch] && side !== "mine") {
+          n = DEFENDERS[ch].cells || 1; top = topOf(c, n);
+          e = addDefender(ch, x + n * 8, top);
+          for (k = c; k < c + n; k++) cols[k] = top - 16;
+        }
+        if (!e) continue;
+        e.cell = { r: r, c: c, n: n }; e.side = side;
+        if (level.fortress && !(e.def && e.def.boat)) e.body.collisionFilter.category = side === "mine" ? MINE : THEIRS;
+        c += n - 1;
+      }
+    }
   }
   function groundAt(x) {
     if (!level) return GROUND;
@@ -255,12 +275,13 @@
   function firstAvailable() { for (var i = 0; i < ORDER.length; i++) if (arsenal[ORDER[i]] > 0) return ORDER[i]; return null; }
   function newWind() { wind = level.wind ? Math.round((Math.random() * 2 - 1) * level.wind) : 0; }
   function defenders() { return ents.filter(function (e) { return e.type === "defender" && !e.dead; }); }
+  function allies() { return ents.filter(function (e) { return e.type === "ally" && !e.dead; }); }
   function defendersLeft() { return defenders().length; }
   function aliveReactor(type) { return defenders().filter(function (d) { return d.def.react && d.def.react.type === type; }); }
 
   function addEnt(e) {
     e.body.plugin = { ent: e }; e.born = simT;
-    if (level && (e.type === "block" || e.type === "defender")) e.wet0 = inWater(pos(e));   // bridge piers built in the river
+    if (level && (e.type === "block" || e.type === "defender" || e.type === "ally")) e.wet0 = inWater(pos(e));   // bridge piers built in the river
     Composite.add(world, e.body); ents.push(e); return e;
   }
   function entOf(body) { return body && body.plugin && body.plugin.ent || null; }
@@ -278,6 +299,14 @@
       { density: d.density, friction: 0.9, frictionStatic: 1, restitution: 0, isStatic: !!d.float });
     return addEnt({ type: "defender", key: d.key, sprite: d.sprite || d.key, w: d.w, h: d.h, hp: d.hp, maxHp: d.hp, pts: d.pts, ox: d.ox || 0, def: d, body: body });
   }
+
+  function addAlly(ch, cx, bottom) {
+    var d = ALLIES[ch];
+    var body = Bodies.rectangle(cx * PH, (bottom - d.h / 2) * PH, d.w * PH, d.h * PH, { density: d.density, friction: 0.9, frictionStatic: 1, restitution: 0 });
+    return addEnt({ type: "ally", key: d.key, sprite: d.sprite, w: d.w, h: d.h, hp: d.hp, maxHp: d.hp, pts: 0, def: d, body: body });
+  }
+  // what a shot can hit: in a fortress battle each side's shots fly straight through its own fort
+  function shotMask(them) { return !level || !level.fortress ? 0xFFFFFFFF : ~(them ? THEIRS : MINE); }
 
   /* ------------------------------------------------------------- physics */
   function onCollide(ev) {
@@ -342,8 +371,10 @@
       poof(p.x, p.y, 14); sfx.ko();
       if (e.def.explodes) pendingBooms.push({ x: p.x, y: p.y, boom: e.def.explodes, fire: e.def.fire });
       if (mode === "play" && defendersLeft() === 0 && !winAt) winAt = simT + 1600;
+    } else if (e.type === "ally") {
+      poof(p.x, p.y, 14); sfx.ko(); say("OUCH!", p.x, p.y - e.h / 2 - 4, "#ff8c6a");
     } else if (e.type === "block") {
-      addScore(e.pts, p.x, p.y);
+      if (e.side !== "mine") addScore(e.pts, p.x, p.y);
       debris(p.x, p.y, e.def.debris, e.w * e.h / 20); sfx.crack();
       if (e.def.explodes) pendingBooms.push({ x: p.x, y: p.y, boom: e.def.explodes, fire: e.def.fire });
     } else if (e.type === "vehicle") {
@@ -409,7 +440,7 @@
       if (!e.dead && !e.wet0 && !(u && u.boat) && !(e.def && e.def.boat) && inWater(pos(e))) splash(e);
       var p = pos(e);
       if (p.x < -100 || p.x > worldW + 100 || p.y > WORLD_H + 80) {
-        if (e.type === "defender" || e.type === "block") kill(e); else e.dead = true;
+        if (e.type === "defender" || e.type === "block" || e.type === "ally") kill(e); else e.dead = true;
       }
     });
   }
@@ -429,7 +460,7 @@
     var p = pos(e);
     for (var i = 0; i < 16; i++) part(p.x + (Math.random() - 0.5) * 10, GROUND + 4, (Math.random() - 0.5) * 1.6, -1.2 - Math.random() * 1.6, 600, i % 2 ? "#ffffff" : "#7fb8e8", 1, 0.12);
     sfx.chute();
-    if (e.type === "defender" || e.type === "block") { kill(e); say("SPLASH!", p.x, GROUND - 10, "#bfe3ff"); }
+    if (e.type === "defender" || e.type === "block" || e.type === "ally") { kill(e); say("SPLASH!", p.x, GROUND - 10, "#bfe3ff"); }
     else { e.dead = true; if (e.troop || e.type === "vehicle") say("SPLASH!", p.x, GROUND - 10, "#bfe3ff"); }
   }
   function driveVehicle(e) {
@@ -445,7 +476,7 @@
 
   // Defenders fighting back
   function reactions() {
-    if (!active) return;
+    if (!active || active.enemy) return;
     var group = active.group.filter(function (e) { return !e.dead; });
     defenders().forEach(function (d) {
       var R = d.def.react; if (!R) return;
@@ -477,7 +508,7 @@
           var ap = pos(a);
           if (dp.x > ap.x && dp.x - ap.x < R.range && simT - (d.lastShot || -1e9) > R.every && simT - active.t0 > 900) {
             d.lastShot = simT;
-            spawnProj(R.shell, dp.x + R.muzzle.x, dp.y + R.muzzle.y, R.vx, R.vy, { bomb: true });
+            spawnProj(R.shell, dp.x + R.muzzle.x, dp.y + R.muzzle.y, R.vx, R.vy, { bomb: true, side: "them" });
             muzzle(dp.x + R.muzzle.x + 2, dp.y + R.muzzle.y); sfx.thump();
           }
         });
@@ -535,7 +566,8 @@
   }
   function spawnProj(spec, x, y, vx, vy, extra) {
     // projectiles never hit each other (arrow storms, shotgun volleys, bombs in a line)
-    var opts = { density: spec.density || 0.004, friction: spec.round ? 0.5 : 0.4, restitution: spec.bounce || 0.1, frictionAir: 0.002, collisionFilter: { group: -1 } };
+    var opts = { density: spec.density || 0.004, friction: spec.round ? 0.5 : 0.4, restitution: spec.bounce || 0.1, frictionAir: 0.002,
+                 collisionFilter: { group: -1, category: 1, mask: shotMask(extra && extra.side === "them") } };
     var body = spec.round ? Bodies.circle(x * PH, y * PH, spec.w / 2 * PH, opts) : Bodies.rectangle(x * PH, y * PH, spec.w * PH, spec.h * PH, opts);
     var e = { type: "proj", key: spec.key || "shot", unit: spec, sprite: spec.sprite, w: spec.w, h: spec.h, body: body, center: true,
               faceVel: spec.faceVel !== false && !spec.round };
@@ -549,7 +581,8 @@
     return e;
   }
   function spawnTroop(u, x, y, vx, vy, extra) {
-    var body = Bodies.rectangle(x * PH, y * PH, u.w * PH, u.h * PH, { density: u.density, friction: 0.6, restitution: 0.2, frictionAir: 0.002, collisionFilter: { group: -2 } });
+    var body = Bodies.rectangle(x * PH, y * PH, u.w * PH, u.h * PH, { density: u.density, friction: 0.6, restitution: 0.2, frictionAir: 0.002,
+                                                                     collisionFilter: { group: -2, category: 1, mask: shotMask(extra && extra.side === "them") } });
     var e = { type: "proj", troop: true, key: u.key, unit: u, sprite: u.sprite, w: u.w, h: u.h, body: body, trail: true };
     if (extra) Object.keys(extra).forEach(function (k) { e[k] = extra[k]; });
     addEnt(e);
@@ -575,8 +608,8 @@
   }
   function launchDrive(key) {
     var u = UNITS[key]; u.key = key;
-    var opts = { density: u.density, friction: 0, frictionStatic: 0, restitution: 0, frictionAir: 0.01 };
-    if (u.boat) opts.collisionFilter = { category: BOAT, mask: 0xFFFFFFFF };
+    var opts = { density: u.density, friction: 0, frictionStatic: 0, restitution: 0, frictionAir: 0.01, collisionFilter: { category: 1, mask: shotMask(false) } };
+    if (u.boat) opts.collisionFilter = { category: BOAT, mask: shotMask(false) };
     var body = Bodies.rectangle(18 * PH, (GROUND - u.h / 2 - 0.5) * PH, u.w * PH, u.h * PH, opts);
     Body.setInertia(body, Infinity);
     spend(key);
@@ -840,7 +873,12 @@
       if (!e.dead && (e.type === "proj" || e.type === "vehicle")) { var p = pos(e); poof(p.x, p.y, 8); e.dead = true; }
     });
     if (winAt || defendersLeft() === 0) { win(); return; }
-    if (!firstAvailable()) { lose(); return; }
+    if (fortress) {
+      // fortress battle: you fire, then they fire back
+      if (!allies().length) { lose("fell"); return; }
+      if (fortress.turn === "me") { if (!firstAvailable()) { lose("ammo"); return; } enemyTurn(); return; }
+      fortress.turn = "me";
+    } else if (!firstAvailable()) { lose(); return; }
     healDefenders();
     if (!arsenal[selected]) selected = firstAvailable();
     newWind(); phase = "ready"; buildBar(); updateHud(); updateHint();
@@ -851,8 +889,10 @@
     if (mode !== "play") return;
     mode = "result"; phase = "over";
     var left = 0; Object.keys(arsenal).forEach(function (k) { left += arsenal[k]; });
+    if (fortress) left = allies().length;      // in a fortress battle every soldier still standing is worth the bonus
     var bonus = left * BONUS; score += bonus;
     var stars = 1 + (score >= starLine[0] ? 1 : 0) + (score >= starLine[1] ? 1 : 0);
+    if (fortress) stars = left >= fortress.soldiers ? 3 : left * 2 >= fortress.soldiers ? 2 : 1;
     store(lossKey(), 0);
     var best = store(bestKey()) || { score: 0, stars: 0 };
     if (score > best.score || stars > best.stars) store(bestKey(), { score: Math.max(score, best.score), stars: Math.max(stars, best.stars) });
@@ -860,11 +900,11 @@
     sfx.fanfare(); updateHud();
     showResult(true, stars, bonus, left);
   }
-  function lose() {
+  function lose(why) {
     if (mode !== "play") return;
     mode = "result"; phase = "over"; sfx.sad();
     store(lossKey(), (store(lossKey()) || 0) + 1);
-    showResult(false, 0, 0, 0);
+    showResult(false, 0, 0, 0, why);
   }
 
   /* ------------------------------------------------------------ effects */
@@ -907,7 +947,8 @@
     var dpr = window.devicePixelRatio || 1, W = Math.max(1, window.innerWidth), H = Math.max(1, window.innerHeight);
     screenC.width = Math.round(W * dpr); screenC.height = Math.round(H * dpr);
     var top = $("hud").offsetHeight, bottom = $("dock").offsetHeight;
-    if (mode !== "play") { top = 0; bottom = 0; }
+    if (mode === "build") { top = $("build-top").offsetHeight; bottom = $("build-dock").offsetHeight; }
+    else if (mode !== "play") { top = 0; bottom = 0; }
     var availH = Math.max(140, H - top - bottom);
     var s = Math.min(W / VIEW_W, availH / (WORLD_H - FIT_TOP));
     scaleDev = s * dpr;
@@ -927,6 +968,14 @@
   function placeCamera() { OX = camMax > 0 ? -Math.round(camX) : Math.floor((bufW - worldW) / 2); }
   function cameraTarget() {
     if (camHoldX != null && simT < camHoldUntil) return camHoldX;
+    if (mode === "build") return camX;
+    if (phase === "enemy") return camMax;
+    if (phase === "active" && active && active.enemy) {
+      // the enemy's shots fly right to left: keep the leading one in view
+      var near = Infinity;
+      active.group.forEach(function (e) { if (!e.dead) near = Math.min(near, pos(e).x); });
+      return near < Infinity ? near - bufW * 0.45 : camX;
+    }
     if (phase === "active" && active) {
       var far = -Infinity;
       active.group.forEach(function (e) { if (!e.dead) far = Math.max(far, pos(e).x); });
@@ -991,6 +1040,37 @@
       c.fillStyle = col || "#4f7f3a"; c.fillRect(x - 3, base - 9, 7, 5); c.fillRect(x - 2, base - 10, 5, 1); c.fillRect(x - 2, base - 4, 5, 1);
     }
   }
+  // Rooftops on the horizon: a village with a church, a city, or the ruins of one (theme `skyline`).
+  function shade(hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    return "rgb(" + [n >> 16, (n >> 8) & 255, n & 255].map(function (v) { return Math.round(v * f); }).join(",") + ")";
+  }
+  function skyline(c, BW, gy, th) {
+    var r = rng(29), x = Math.floor(r() * 30), kind = th.skyline, col = th.skylineColor || shade(th.hills[1], 0.8);
+    var lit = th.night ? "#ffd86b" : "rgba(255,255,255,0.16)", dark = "rgba(0,0,0,0.25)", base = gy;
+    while (x < BW) {
+      var w = kind === "city" ? 14 + Math.floor(r() * 16) : 10 + Math.floor(r() * 10), h = kind === "city" ? 20 + Math.floor(r() * 26) : 10 + Math.floor(r() * 10), i, y;
+      c.fillStyle = col;
+      if (kind !== "city" && r() < 0.14) {
+        // a church: a tall tower with a pointed spire beside the nave (ruined churches lose the spire)
+        c.fillRect(x, base - 13, 16, 13); c.fillRect(x + 16, base - 32, 7, 32);
+        if (kind === "ruins") { for (i = 0; i < 7; i += 2) c.fillRect(x + 16 + i, base - 35 + Math.floor(r() * 5), 2, 4); }
+        else { for (i = 0; i < 3; i++) c.fillRect(x + 17 + i, base - 34 - i * 3, 5 - i * 2, 3); c.fillRect(x + 19, base - 44, 1, 4); }
+        x += 26 + Math.floor(r() * 10); continue;
+      }
+      if (kind === "ruins") {
+        // broken walls: a jagged top, and some stand alone like chimneys
+        for (i = 0; i < w; i += 2) { var hh = Math.max(3, Math.round(h * (0.35 + r() * 0.65))); c.fillRect(x + i, base - hh, 2, hh); }
+        c.fillStyle = dark; for (y = base - h + 6; y < base - 4; y += 6) for (i = x + 2; i < x + w - 3; i += 5) if (r() < 0.35) c.fillRect(i, y, 2, 3);
+      } else {
+        c.fillRect(x, base - h, w, h);
+        if (kind === "city") c.fillRect(x + 1, base - h - 3, w - 2, 3);
+        else for (i = 1; i < Math.ceil(w / 2); i++) c.fillRect(x + i, base - h - i, w - i * 2, 1);
+        for (y = base - h + 4; y < base - 4; y += 5) for (i = x + 2; i < x + w - 2; i += 4) if (r() < 0.4) { c.fillStyle = r() < 0.5 ? lit : dark; c.fillRect(i, y, 2, 2); }
+      }
+      x += w + (kind === "city" ? 1 + Math.floor(r() * 4) : 3 + Math.floor(r() * 16));
+    }
+  }
   function buildBackground() {
     // painted once for the whole battlefield plus a screen's width of margin on each side
     bgPad = bufW;
@@ -1031,6 +1111,7 @@
         if (th.trees && k === 0 && hr() < 0.08) { tree(c, x, gy - hh + 1, th.trees, th.treeColor); c.fillStyle = h[0]; }
       }
     });
+    if (th.skyline) skyline(c, BW, gy, th);
     var split = BX + (level.cliff ? level.cliff.x : (th.split || 9999));
     groundBand(c, 0, clamp(split, 0, BW), gy, bufH, th.left, 3);
     if (split < BW) groundBand(c, Math.max(0, split), BW - Math.max(0, split), gy, bufH, th.right, 11);
@@ -1070,6 +1151,13 @@
     for (i = 0; i < 3; i++) c.drawImage(sprite(pack.props.bunker), BUNKER_X + i * 16, GROUND - 16);
     c.drawImage(sprite(pack.props.sling || "slingshot"), SLING_X, GROUND - 24);
     c.restore();
+    if (level.fortress) {
+      // the enemy's own launcher at the far end, facing back at you
+      c.save(); c.translate(BX + worldW, OY); c.scale(-1, 1);
+      for (i = 0; i < 3; i++) c.drawImage(sprite(pack.props.bunker), BUNKER_X + i * 16, GROUND - 16);
+      c.drawImage(sprite(pack.props.sling || "slingshot"), SLING_X, GROUND - 24);
+      c.restore();
+    }
   }
 
   function pixelLine(c, x0, y0, x1, y1, color) {
@@ -1109,7 +1197,7 @@
       if (e.type === "block" && e.hp < e.maxHp * 0.6) c.drawImage(crack, -8, -8, 16, 16);
     }
     c.restore();
-    if ((e.type === "defender" || e.type === "vehicle") && e.hp < e.maxHp && e.hp > 0) {
+    if ((e.type === "defender" || e.type === "vehicle" || e.type === "ally") && e.hp < e.maxHp && e.hp > 0) {
       var top = Math.round(y - e.h / 2 - (s.height - e.h) - 5), w = 14, f = Math.max(0, e.hp / e.maxHp);
       c.fillStyle = OUTLINE; c.fillRect(Math.round(x - w / 2) - 1, top - 1, w + 2, 4);
       c.fillStyle = "#5b1d1d"; c.fillRect(Math.round(x - w / 2), top, w, 2);
@@ -1191,8 +1279,9 @@
     var tx = SLING.x + pull.x, ty = SLING.y + pull.y;
     if (slingTroop) pixelLine(c, 123, 248, tx + 3, ty, "#3d2414");
 
-    var order = { block: 0, defender: 1, vehicle: 2, proj: 3 };
+    var order = { block: 0, defender: 1, ally: 1, vehicle: 2, proj: 3 };
     ents.slice().sort(function (a, b) { return order[a.type] - order[b.type]; }).forEach(function (e) { drawEnt(c, e); });
+    if (mode === "build" && build) drawBuildOverlay(c);
 
     if (slingTroop) {
       var ts = sprite(UNITS[selected].sprite);
@@ -1272,9 +1361,11 @@
     try { screenC.setPointerCapture(ev.pointerId); } catch (err) { /* older browsers */ }
   }
   screenC.addEventListener("pointerdown", function (ev) {
+    if (mode === "build") { buildHover(toWorld(ev)); startGesture(ev); return; }
     if (mode !== "play") return;
     ac();
     if (introPan) { introPan = false; camHoldUntil = 0; camX = 0; }
+    if (phase === "enemy" || (active && active.enemy)) { startGesture(ev); return; }     // their turn: you can only look around
     if (phase === "active") { special(); return; }
     if (phase !== "ready" || !selected || !arsenal[selected]) { startGesture(ev); return; }
     var kind = UNITS[selected].kind, r = screenC.getBoundingClientRect();
@@ -1286,6 +1377,7 @@
     } else startGesture(ev);
   });
   screenC.addEventListener("pointermove", function (ev) {
+    if (mode === "build") buildHover(toWorld(ev));
     if (phase === "aiming" && aim && ev.pointerId === aim.id) { aim.cx = ev.clientX; aim.cy = ev.clientY; return; }
     if (gesture && ev.pointerId === gesture.id) {
       var dx = ev.clientX - gesture.sx;
@@ -1299,6 +1391,7 @@
   function release(ev) {
     if (gesture && ev.pointerId === gesture.id) {
       var g = gesture; gesture = null;
+      if (mode === "build") { if (g.moved < 8) buildTap(toWorld(ev)); return; }
       if (g.moved < 8 && phase === "ready" && selected && arsenal[selected]) {
         var kind = UNITS[selected].kind;
         if (kind === "drive") launchDrive(selected);
@@ -1314,11 +1407,12 @@
   }
   screenC.addEventListener("pointerup", release);
   screenC.addEventListener("wheel", function (ev) {
-    if (mode !== "play" || camMax <= 0 || phase === "aiming") return;
+    if ((mode !== "play" && mode !== "build") || camMax <= 0 || phase === "aiming") return;
     ev.preventDefault();
     camHoldX = clamp((camHoldX != null ? camHoldX : camX) + (ev.deltaX || ev.deltaY) * 0.5, 0, camMax); camHoldUntil = Infinity;
     updateLookButton();
   }, { passive: false });
+  screenC.addEventListener("pointerleave", function () { if (mode === "build") buildHover(null); });
   screenC.addEventListener("pointercancel", function () { gesture = null; if (phase === "aiming") { aim = null; phase = "ready"; updateHint(); } });
 
   /* ---------------------------------------------------------------- UI */
@@ -1357,7 +1451,7 @@
     setText("lvl-name", level.name); setText("lvl-date", level.date);
     setText("score", fmt(score));
     var n = defendersLeft();
-    setText("foes", n + (n === 1 ? " defender left" : " defenders left"));
+    setText("foes", fortress ? "Them: " + n + " · You: " + allies().length : n + (n === 1 ? " defender left" : " defenders left"));
     setText("wind", wind === 0 ? "Calm" : (wind < 0 ? "← " : "") + Math.abs(wind) + (wind > 0 ? " →" : ""));
   }
   var TAP_HINT = {
@@ -1368,14 +1462,16 @@
   function updateHint() {
     var h = $("hint"), a = active && active.lead;
     if (mode !== "play") { h.textContent = ""; return; }
-    if (phase === "active" && a && !a.dead && a.unit && a.unit.tap) {
+    if (phase === "active" && a && !a.dead && a.unit && a.unit.tap && !active.enemy) {
       var u = a.unit, t = TAP_HINT[u.tap] || "";
       if (u.tap === "chute" && a.chute) t = "Floating down…";
       if (u.tap === "shoot") t = a.shots ? "Tap to fire! " + a.shots + (a.shots === 1 ? " shot" : " shots") + " left" : "Out of ammo.";
       if (u.tap === "unload" && a.unloaded) t = "Over they go!";
       if (a.usedTap && /shout|dash|split|pound|sharpshoot/.test(u.tap)) t = "";
       h.textContent = t;
-    } else if (phase === "active") h.textContent = "Here it comes…";
+    } else if (phase === "active" && active && active.enemy) h.textContent = "Incoming! Hold on to your fortress…";
+    else if (phase === "active") h.textContent = "Here it comes…";
+    else if (phase === "enemy") h.textContent = "The enemy is aiming at your fortress…";
     else if (phase === "settling") h.textContent = "Waiting for the dust to settle…";
     else h.textContent = selected ? UNITS[selected].hint : "";
   }
@@ -1384,8 +1480,9 @@
     return '<svg class="star' + (on ? " on" : "") + '" viewBox="0 0 9 9" aria-hidden="true"><path d="M4 0h1v2h1v1h3v1h-1v1h-1v2h1v2h-1v-1h-1v-1h-3v1h-1v1h-1v-2h1v-2h-1v-1h-1v-1h3v-1h1z"/></svg>';
   }
   function show(id) {
-    ["menu", "intro", "result", "campaign"].forEach(function (o) { $(o).hidden = o !== id; });
-    document.body.classList.toggle("playing", id === null);
+    ["menu", "intro", "result", "campaign", "builder", "build-setup", "fortress"].forEach(function (o) { $(o).hidden = o !== id; });
+    document.body.classList.toggle("playing", id === null && mode !== "build");
+    document.body.classList.toggle("building", mode === "build" && (id === null || id === "build-setup"));
     resize();
   }
   function buildMenu() {
@@ -1399,11 +1496,12 @@
       tabs.appendChild(b);
     });
     setText("pack-blurb", pack.side + " vs. " + pack.foe + ". " + pack.blurb);
+    buildModes();
     var slot = $("camp-banner-slot"); slot.innerHTML = "";
     if (pack.campaign) {
       var C = pack.campaign, cs = campState(pack), cb = document.createElement("button");
       cb.type = "button"; cb.className = "camp-banner";
-      cb.appendChild(iconCanvas(C.missions.length && cs.done.length >= C.missions.length ? "officer" : pack.icon, 56, 40));
+      cb.appendChild(iconCanvas(C.icon || pack.icon, 56, 40));
       cb.insertAdjacentHTML("beforeend", "<b>Campaign: " + C.name + "</b><small>" + (cs.done.length >= C.missions.length ? "Complete! " : cs.done.length + " of " + C.missions.length + " missions won · ") +
         "Rank: " + campRank(C, cs) + "</small><span class=\"go\">" + (cs.done.length ? "Continue" : "Start") + "</span>");
       cb.addEventListener("click", function () { ac(); openCampaign(); });
@@ -1421,14 +1519,17 @@
       list.appendChild(b);
     });
   }
-  function openIntro(i) {
-    loadLevel(i); mode = "intro";
+  function openIntro(i, L) {
+    loadLevel(i, L); mode = "intro";
     setText("intro-pack", campaign ? campaign.C.name + " · Mission " + (campaign.i + 1) + " of " + campaign.C.missions.length
-      : pack.name + " · " + pack.side + " vs. " + pack.foe);
+      : fortress ? "Fortress Battle · " + pack.side + " vs. " + pack.foe : custom ? "Level Builder · " + pack.name : pack.name + " · " + pack.side + " vs. " + pack.foe);
     setText("intro-name", level.name); setText("intro-date", level.date);
     setText("intro-history", level.history); setText("intro-tip", level.tip);
-    var tough = campaign ? campaign.C.toughness[campaign.i] || 1 : 1;
-    setText("intro-goal", "Knock out all " + defendersLeft() + " defenders." + (tough > 1 ? " They're " + Math.round((tough - 1) * 100) + "% tougher now!" : "") +
+    $("intro-history").parentNode.firstChild.textContent = level.custom || level.fortress ? "How it works" : "Real history";
+    var tough = campaign ? campaign.C.toughness[campaign.i] || 1 : level.toughness || 1;
+    setText("intro-goal", fortress ? "Knock out all " + defendersLeft() + " enemy defenders before they get your " + allies().length + " soldiers!" +
+      (tough > 1 ? " They're " + Math.round((tough - 1) * 100) + "% tougher!" : "")
+      : "Knock out all " + defendersLeft() + " defenders." + (tough > 1 ? " They're " + Math.round((tough - 1) * 100) + "% tougher now!" : "") +
       " Win with 2 left in your arsenal for \u2605\u2605\u2605.");
     if (extraTroop) setText("intro-tip", "Bonus for trying hard: one extra " + UNITS[extraTroop].name + "! " + level.tip);
     var ars = $("intro-arsenal"); ars.innerHTML = "";
@@ -1462,22 +1563,34 @@
     });
     updateLookButton();
   }
-  function showResult(won, stars, bonus, left) {
+  function showResult(won, stars, bonus, left, why) {
     setText("result-title", won ? "Victory!" : "The fort holds");
     $("result-stars").innerHTML = won ? starSvg(stars > 0) + starSvg(stars > 1) + starSvg(stars > 2) : "";
     setText("result-score", fmt(score));
     setText("result-note", won
       ? (left ? left + " left in your arsenal: +" + fmt(bonus) + " bonus" : "You used everything in your arsenal.")
       : "You ran out of troops and weapons. Try a different order, or check the tip.");
-    $("btn-next").hidden = !won || levelIndex >= pack.levels.length - 1;
+    $("btn-next").hidden = !won || levelIndex < 0 || levelIndex >= pack.levels.length - 1;
     $("btn-next").textContent = "Next battle"; $("btn-next").disabled = false;
     $("btn-retry").textContent = "Play again"; $("btn-result-menu").textContent = "Menu"; $("btn-result-menu").hidden = false;
     $("result-rewards").hidden = true;
+    if (fortress) {
+      if (won) setText("result-note", left + " of " + fortress.soldiers + (fortress.soldiers === 1 ? " soldier" : " soldiers") + " still standing: +" + fmt(bonus) + " bonus");
+      else {
+        setText("result-title", why === "ammo" ? "Out of ammo!" : "Your fortress fell!");
+        setText("result-note", why === "ammo" ? "You ran out of troops and weapons before their fort fell." : "They knocked out all your soldiers. Build it stronger, or hit them harder first!");
+      }
+      $("btn-next").hidden = false; $("btn-next").textContent = "New enemy fort";
+      $("btn-result-menu").textContent = "Fortress menu";
+    } else if (custom) {
+      $("btn-result-menu").textContent = custom.editing ? "Back to builder" : "My levels";
+      if (!won) setText("result-note", "You ran out of troops and weapons. Add more to the arsenal in Setup, or change the fort.");
+    }
     if (campaign) {
       var C = campaign.C, cs = campaign.s;
       if (won && cs.done.length >= C.missions.length && campaign.i === C.missions.length - 1) {
         setText("result-title", "Campaign complete!");
-        setText("result-note", "You fought all the way from the beaches to the Rhine. You've been promoted to " + campRank(C, cs) + "!");
+        setText("result-note", (C.finale || "You won every battle in the campaign.") + " You've been promoted to " + campRank(C, cs) + "!");
       }
       $("btn-next").hidden = !won; $("btn-next").textContent = "To the map";
       $("btn-retry").textContent = won ? "Play again" : "Try again";
@@ -1489,8 +1602,9 @@
     }
     setTimeout(function () { if (mode === "result") show("result"); }, 900);
   }
-  function toMenu() { campaign = null; UNITS = pack.units; mode = "menu"; buildMenu(); show("menu"); }
-  function leaveBattle() { if (campaign) openCampaign(); else toMenu(); }
+  function toMenu() { campaign = null; fortress = null; custom = null; UNITS = pack.units; mode = "menu"; if (pack.levels.indexOf(level) < 0) loadLevel(0); buildMenu(); show("menu"); }
+  function leaveBattle() { if (campaign) openCampaign(); else if (fortress) openFortress(); else if (custom) leaveCustom(); else toMenu(); }
+  function reloadLevel() { loadLevel(levelIndex, levelIndex < 0 ? level : null); }
 
   /* ------------------------------------------------------------ campaign */
   // A campaign strings a pack's battles into a route on a map. Each first win offers a choice of rewards that
@@ -1544,7 +1658,7 @@
         // three rewards the army doesn't have yet; the same three every time for this mission
         var pool = C.rewards.filter(function (r) { return cs.perks.indexOf(r.id) < 0; }), pick = rng(campaign.i * 7 + 3), offer = [];
         while (pool.length && offer.length < 3) offer.push(pool.splice(Math.floor(pick() * pool.length), 1)[0].id);
-        cs.offers[id] = offer; cs.pending = id;
+        if (offer.length) { cs.offers[id] = offer; cs.pending = id; }
       }
     }
     store(campKey(campaign.P), cs); campaign.s = cs;
@@ -1577,12 +1691,20 @@
       c.fillRect(x, y, dashed ? 1 : 2, dashed ? 1 : 2);
     }
   }
-  function drawCampaignMap(C, cs) {
-    var cv = $("camp-map"), c = cv.getContext("2d"), W = cv.width, H = cv.height, M = C.map;
+  // Chapters split a long campaign into parts. A chapter's `view` [x0, y0, w] zooms into the overall 384 × 216 map.
+  function campChapters(C) { return C.chapters && C.chapters.length ? C.chapters : [{ start: 0 }]; }
+  function chapterOf(C, k) { var ch = campChapters(C), n = 0; for (var i = 0; i < ch.length; i++) if (ch[i].start <= k) n = i; return n; }
+  function chapterEnd(C, n) { var ch = campChapters(C); return n + 1 < ch.length ? ch[n + 1].start - 1 : C.missions.length - 1; }
+  function mapView(ch) {
+    var v = ch && ch.view, k = v ? 384 / v[2] : 1, x0 = v ? v[0] : 0, y0 = v ? v[1] : 0;
+    return { k: k, pt: function (p) { return [(p[0] - x0) * k, (p[1] - y0) * k]; } };
+  }
+  function drawCampaignMap(C, cs, ch) {
+    var cv = $("camp-map"), c = cv.getContext("2d"), W = cv.width, H = cv.height, M = C.map, V = mapView(ch);
     var img = c.createImageData(W, H), d = img.data, mask = new Uint8Array(W * H), r = rng(77), x, y, i;
     // land from outlines (even-odd scanline fill), sea everywhere else
     M.land.forEach(function (poly, n) {
-      var pts = poly.pts;
+      var pts = poly.pts.map(V.pt);
       for (y = 0; y < H; y++) {
         var cuts = [], yy = y + 0.5;
         for (var e = 0; e < pts.length; e++) {
@@ -1595,7 +1717,7 @@
     });
     var TINT = { england: ["#86a85e", "#78994f", "#97b86c"], europe: ["#9aa860", "#8a9852", "#a9b56f"] };
     function put(k, hex) { d[k * 4] = parseInt(hex.substr(1, 2), 16); d[k * 4 + 1] = parseInt(hex.substr(3, 2), 16); d[k * 4 + 2] = parseInt(hex.substr(5, 2), 16); d[k * 4 + 3] = 255; }
-    function land(px, py) { return px >= 0 && py >= 0 && px < W && py < H && mask[py * W + px] > 0; }
+    function land(px, py) { return mask[clamp(py, 0, H - 1) * W + clamp(px, 0, W - 1)] > 0; }   // past the edge counts as more of the same
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
       i = y * W + x; var v = r();
       if (!mask[i]) { put(i, x % 32 === 16 || y % 32 === 16 ? "#284d73" : v < 0.05 ? "#3a6a96" : "#2f5a85"); continue; }
@@ -1609,53 +1731,78 @@
     }
     c.putImageData(img, 0, 0);
     (M.forests || []).forEach(function (f) {
-      var fr = rng(f.x);
-      for (var k = 0; k < f.rx * f.ry / 3; k++) {
-        var a = fr() * Math.PI * 2, rr = Math.sqrt(fr()), tx = Math.round(f.x + Math.cos(a) * rr * f.rx), ty = Math.round(f.y + Math.sin(a) * rr * f.ry);
+      var fr = rng(f.x), fc = V.pt([f.x, f.y]), rx = f.rx * V.k, ry = f.ry * V.k;
+      for (var k = 0; k < rx * ry / 3; k++) {
+        var a = fr() * Math.PI * 2, rr = Math.sqrt(fr()), tx = Math.round(fc[0] + Math.cos(a) * rr * rx), ty = Math.round(fc[1] + Math.sin(a) * rr * ry);
         c.fillStyle = "#2f5a2a"; c.fillRect(tx, ty, 2, 2); c.fillStyle = "#4f8a3a"; c.fillRect(tx, ty, 1, 1);
       }
     });
     (M.rivers || []).forEach(function (rv) {
-      for (var k = 0; k + 1 < rv.pts.length; k++) {
-        routePixels(c, rv.pts[k], rv.pts[k + 1], "#3f78b5", false);
-        if (rv.w < 2) routePixels(c, [rv.pts[k][0] + 1, rv.pts[k][1]], [rv.pts[k + 1][0] + 1, rv.pts[k + 1][1]], "#9aa860", false);
+      var pts = rv.pts.map(V.pt);
+      for (var k = 0; k + 1 < pts.length; k++) {
+        routePixels(c, pts[k], pts[k + 1], "#3f78b5", false);
+        if (rv.w < 2) routePixels(c, [pts[k][0] + 1, pts[k][1]], [pts[k + 1][0] + 1, pts[k + 1][1]], "#9aa860", false);
       }
     });
-    (M.cities || []).forEach(function (ct) { c.fillStyle = "#1d1a2b"; c.fillRect(ct.x - 2, ct.y - 2, 5, 5); c.fillStyle = "#ffffff"; c.fillRect(ct.x - 1, ct.y - 1, 3, 3); });
+    // front lines and borders: a 2 px line, dashed if asked
+    (M.lines || []).forEach(function (ln) {
+      var pts = ln.pts.map(V.pt);
+      for (var k = 0; k + 1 < pts.length; k++) routeLine(c, pts[k], pts[k + 1], ln.color || "#b8432f", ln.dashed);
+    });
+    var zoomed = ch && ch.view, cities = zoomed ? ch.cities || [] : M.cities || [], labels = zoomed ? ch.labels || [] : M.labels || [];
+    cities.forEach(function (ct) { var q = V.pt([ct.x, ct.y]); c.fillStyle = "#1d1a2b"; c.fillRect(Math.round(q[0]) - 2, Math.round(q[1]) - 2, 5, 5); c.fillStyle = "#ffffff"; c.fillRect(Math.round(q[0]) - 1, Math.round(q[1]) - 1, 3, 3); });
     // the route: solid gold where you've already fought, dashed white ahead
     C.missions.forEach(function (m, k) {
       if (!k) return;
-      var prev = C.missions[k - 1], pts = [[prev.x, prev.y]].concat(m.via || [], [[m.x, m.y]]), won = cs.done.indexOf(m.level) >= 0;
+      var prev = C.missions[k - 1], pts = [[prev.x, prev.y]].concat(m.via || [], [[m.x, m.y]]).map(V.pt), won = cs.done.indexOf(m.level) >= 0;
       for (var j = 0; j + 1 < pts.length; j++) {
         if (won) routePixels(c, [pts[j][0] - 1, pts[j][1] - 1], [pts[j + 1][0] - 1, pts[j + 1][1] - 1], "#1d1a2b", false);
         routePixels(c, pts[j], pts[j + 1], won ? "#ffd23f" : "#ffffff", !won);
       }
     });
-    var labels = $("camp-labels"); labels.innerHTML = "";
-    (M.labels || []).concat((M.cities || []).map(function (ct) { return { text: ct.name, x: ct.x, y: ct.y, city: true }; })).forEach(function (lb) {
-      var el = document.createElement("span");
+    var box = $("camp-labels"); box.innerHTML = "";
+    labels.concat(cities.map(function (ct) { return { text: ct.name, x: ct.x, y: ct.y, city: true }; })).forEach(function (lb) {
+      var el = document.createElement("span"), q = V.pt([lb.x, lb.y]);
       el.textContent = lb.text; el.className = lb.sea ? "sea" : lb.city ? "city" : "";
-      el.style.left = (lb.x / W * 100) + "%"; el.style.top = (lb.y / H * 100) + "%";
-      labels.appendChild(el);
+      el.style.left = (q[0] / W * 100) + "%"; el.style.top = (q[1] / H * 100) + "%";
+      box.appendChild(el);
     });
+  }
+  function routeLine(c, a, b, color, dashed) {
+    var n = Math.max(1, Math.round(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]))));
+    c.fillStyle = color;
+    for (var k = 0; k <= n; k++) { if (dashed && k % 5 > 2) continue; c.fillRect(Math.round(a[0] + (b[0] - a[0]) * k / n), Math.round(a[1] + (b[1] - a[1]) * k / n), 2, 2); }
   }
   function renderCampaign() {
     var P = pack, C = P.campaign, cs = campState(P), next = campNext(C, cs), W = 384, H = 216;
+    var chs = campChapters(C), cn = chapterOf(C, campSel), ch = chs[cn], V = mapView(ch);
     setText("camp-eyebrow", P.name + " campaign"); setText("camp-title", C.name); setText("camp-blurb", C.blurb);
-    drawCampaignMap(C, cs);
+    drawCampaignMap(C, cs, ch);
+    // chapter tabs: a chapter opens once its first mission is unlocked
+    var tabs = $("camp-chapters"); tabs.innerHTML = ""; tabs.hidden = chs.length < 2;
+    chs.forEach(function (h, n) {
+      var b = document.createElement("button"), end = chapterEnd(C, n), wonAll = true;
+      for (var k = h.start; k <= end; k++) if (cs.done.indexOf(C.missions[k].level) < 0) wonAll = false;
+      b.type = "button"; b.className = "chap" + (wonAll ? " done" : "");
+      b.disabled = h.start > next; b.setAttribute("aria-pressed", String(n === cn));
+      b.innerHTML = "<small>Part " + (n + 1) + "</small><b>" + (h.name || "") + "</b>";
+      b.addEventListener("click", function () { campSel = clamp(next, h.start, end); renderCampaign(); });
+      tabs.appendChild(b);
+    });
     var pins = $("camp-pins"); pins.innerHTML = "";
     C.missions.forEach(function (m, k) {
-      var L = P.levels[levelNumber(P, m.level)], won = cs.done.indexOf(m.level) >= 0, locked = k > next, b = document.createElement("button");
+      if (chapterOf(C, k) !== cn) return;
+      var L = P.levels[levelNumber(P, m.level)], won = cs.done.indexOf(m.level) >= 0, locked = k > next, b = document.createElement("button"), q = V.pt([m.x, m.y]);
       b.type = "button"; b.className = "pin " + (won ? "done" : locked ? "locked" : "next");
       b.textContent = String(k + 1); b.disabled = locked;
-      b.style.left = (m.x / W * 100) + "%"; b.style.top = (m.y / H * 100) + "%";
+      b.style.left = (q[0] / W * 100) + "%"; b.style.top = (q[1] / H * 100) + "%";
       b.setAttribute("aria-pressed", String(k === campSel));
       b.setAttribute("aria-label", "Mission " + (k + 1) + ": " + L.name + (won ? ", won" : locked ? ", locked" : ", next up"));
       b.addEventListener("click", function () { campSel = k; renderCampaign(); });
       pins.appendChild(b);
     });
     var m = C.missions[campSel], L = P.levels[levelNumber(P, m.level)], won = cs.done.indexOf(m.level) >= 0, tough = C.toughness[campSel] || 1;
-    setText("cm-num", "Mission " + (campSel + 1) + " of " + C.missions.length + (L.airOnly ? " · Air Force" : ""));
+    setText("cm-num", (ch.name ? ch.name + " · " : "") + "Mission " + (campSel + 1) + " of " + C.missions.length + (L.airOnly ? " · Air Force" : ""));
     setText("cm-name", L.name); setText("cm-date", L.date);
     var st = cs.stars[m.level] || 0;
     $("cm-stars").innerHTML = won ? starSvg(st > 0) + starSvg(st > 1) + starSvg(st > 2) : "";
@@ -1702,13 +1849,698 @@
     openIntro(levelNumber(pack, C.missions[k].level));
   }
 
+  /* ------------------------------------------------------- level builder */
+  // Build your own battle: tap the battlefield to drop fort pieces and defenders on top of whatever is already
+  // there, dig trenches and rivers, raise a hill, pick the arsenal, then test it. A level is just a fort drawing
+  // like the ones in the pack files, so the builder edits those rows directly. Levels are saved in the browser
+  // and can be shared as a code. The same builder makes your own fortress for a fortress battle.
+  var BUILD_X = 240, MAX_ROWS = 10, MAX_LEVELS = 60;
+  var MY_X = 150, MY_COLS = 14, FORT_W = 1100, COINS = 40, MAX_SOLDIERS = 5;
+  var SIZES = [{ name: "Small", w: 720 }, { name: "Medium", w: 900 }, { name: "Big", w: 1100 }];
+  var WINDS = [{ name: "Calm", v: 0 }, { name: "Breezy", v: 2 }, { name: "Windy", v: 4 }];
+  var TOOLS = {
+    erase:  { name: "Erase", kind: "Tool", hint: "Tap a piece to take it away." },
+    trench: { name: "Trench", kind: "Ground", hint: "Tap the ground to dig a trench. Tap it again to fill it in." },
+    river:  { name: "River", kind: "Ground", hint: "Tap the ground to make a river. Troops and blocks that fall in are lost, but boats float." },
+    hill:   { name: "Hill", kind: "Ground", hint: "Tap where a hill should start: the ground is higher from there on. Tap its edge again to flatten it." }
+  };
+  var custom = null;       // a builder level being played: { draft, editing }
+  var build = null;        // the builder while it's open: { draft, tool, undo, hover, msgUntil }
+
+  function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, " "); }
+  function customLevels() { var a = store("angrydudes.custom"); return Array.isArray(a) ? a : []; }
+  function saveDraft(d) { store("angrydudes.custom", [d].concat(customLevels().filter(function (x) { return x.id !== d.id; })).slice(0, MAX_LEVELS)); }
+  function deleteDraft(id) { store("angrydudes.custom", customLevels().filter(function (x) { return x.id !== id; })); }
+  function zoneX(d) { return d.fortress ? MY_X : BUILD_X; }
+  function zoneCols(d) { return d.fortress ? MY_COLS : Math.floor((d.width - 16 - BUILD_X) / 16); }
+  function pieceOf(ch) { return (build && build.draft.fortress && ALLIES[ch]) || BLOCKS[ch] || DEFENDERS[ch]; }
+  function widthOf(ch) { return DEFENDERS[ch] && !(build && build.draft.fortress && ALLIES[ch]) ? DEFENDERS[ch].cells || 1 : 1; }
+  function themeGravity(t) { var L = pack.levels.filter(function (x) { return x.theme === t; })[0]; return L && L.gravity || 1; }
+  function newDraft() {
+    var mine = customLevels().filter(function (x) { return x.pack === pack.id; }).length;
+    return { id: Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), pack: pack.id, name: "My battle " + (mine + 1),
+             width: 900, theme: pack.levels[0].theme, wind: 2, fort: [], ground: "", hill: -1, floaters: [], arsenal: {} };
+  }
+  function draftLevel(d) {
+    var trenches = [], g = d.ground || "", c = 0, n;
+    while (c < g.length) {
+      if (g[c] !== "t" && g[c] !== "w") { c++; continue; }
+      n = 1; while (g[c + n] === g[c]) n++;
+      trenches.push({ x: BUILD_X + c * 16, w: n * 16, d: g[c] === "w" ? 40 : 20, water: g[c] === "w" });
+      c += n;
+    }
+    return { id: "custom-" + d.id, name: d.name || "My battle", date: "Built by you", theme: d.theme, width: d.width, gravity: themeGravity(d.theme), custom: true,
+      history: "This battle was made in the Level Builder, and every piece of the fort is right where its builder put it.",
+      tip: "Look for the weak spot: knock out what holds up a roof and everything on it comes down.",
+      fortX: BUILD_X, fort: d.fort.length ? d.fort : ["."], trenches: trenches, cliff: d.hill >= 0 ? { x: BUILD_X + d.hill * 16, h: 48 } : null,
+      extras: (d.floaters || []).map(function (f) { return { type: f.type, x: BUILD_X + f.c * 16 + 8, alt: 96 }; }),
+      arsenal: d.arsenal || {}, wind: d.wind };
+  }
+  function countPieces(d) {
+    var out = { pieces: 0, foes: 0, fighters: 0, coins: 0, soldiers: 0, items: 0 };
+    d.fort.forEach(function (row) {
+      for (var i = 0; i < row.length; i++) {
+        var ch = row[i];
+        if (d.fortress && ALLIES[ch]) { out.soldiers++; continue; }
+        if (BLOCKS[ch]) { out.pieces++; out.coins += blockCost(ch); }
+        else if (DEFENDERS[ch]) { out.foes++; if (DEFENDERS[ch].react) out.fighters++; }
+      }
+    });
+    (d.floaters || []).forEach(function () { out.foes++; });
+    Object.keys(d.arsenal || {}).forEach(function (k) { out.items += d.arsenal[k]; });
+    return out;
+  }
+  function blockCost(ch) { var b = BLOCKS[ch]; return clamp(Math.round(b.hp * (b.slab ? 0.6 : 1)), 1, 5); }
+
+  // the fort as a grid of characters, top row first, one column per 16 px
+  function gridOf(d) {
+    var cols = zoneCols(d);
+    return d.fort.map(function (row) { var a = row.split("").slice(0, cols); while (a.length < cols) a.push("."); return a; });
+  }
+  function setGrid(d, g) {
+    // a wide piece cut off at the edge (after the battlefield shrinks) goes, and so do empty rows on top
+    g.forEach(function (row) { for (var c = 0; c < row.length; c++) if (row[c] === "-" && (c === 0 || row[c - 1] === ".")) row[c] = "."; });
+    while (g.length && g[0].every(function (ch) { return ch === "."; })) g.shift();
+    d.fort = g.map(function (a) { return a.join("").replace(/\.+$/, ""); });
+  }
+  function colTop(g, c) { for (var r = 0; r < g.length; r++) if (g[r][c] !== ".") return r; return g.length; }
+  // The pieces standing in columns c..c+n-1, split into those above the tap and those below it. A tap in empty
+  // space with something over it (a room under a roof) puts the new piece in there instead of on top.
+  function stackAt(d, c, n, w) {
+    var above = [], below = [], inside = false;
+    ents.forEach(function (e) {
+      if (e.dead || !e.cell || !!d.fortress !== (e.side === "mine")) return;
+      if (e.cell.c + e.cell.n <= c || e.cell.c >= c + n) return;
+      var p = pos(e), top = p.y - e.h / 2, bot = p.y + e.h / 2;
+      if (w && w.y >= top - 1 && w.y <= bot + 1) inside = true;
+      (w && bot <= w.y ? above : below).push({ r: e.cell.r, top: top });
+    });
+    return { above: above, below: below, under: !!w && !inside && above.length > 0 };
+  }
+  function placePiece(d, ch, c, w) {
+    var g = gridOf(d), cols = zoneCols(d), n = widthOf(ch), top = Infinity, best = -1, k, r;
+    c = clamp(c, 0, cols - n);
+    var st = stackAt(d, c, n, w);
+    if (st.under) {
+      // between the lowest piece over the tap and the highest piece under it; an empty row slipped in changes nothing else
+      var rmin = Math.max.apply(null, st.above.map(function (a) { return a.r; })), rmax = Math.min.apply(null, st.below.map(function (b) { return b.r; }).concat([g.length]));
+      r = rmax - 1;
+      var free = r > rmin;
+      for (k = c; k < c + n && free; k++) if (g[r][k] !== ".") free = false;
+      if (!free) { var blank = []; for (k = 0; k < cols; k++) blank.push("."); g.splice(rmin + 1, 0, blank); r = rmin + 1; }
+      if (g.length > MAX_ROWS) return "That's as tall as a fort can go!";
+      g[r][c] = ch; for (k = 1; k < n; k++) g[r][c + k] = "-";
+      setGrid(d, g); return null;
+    }
+    for (k = c; k < c + n; k++) top = Math.min(top, colTop(g, k));
+    r = top - 1;
+    // a slab beside another one at the same height joins it, so roofs and bridges grow sideways
+    if (BLOCKS[ch] && BLOCKS[ch].slab) [c - 1, c + 1].forEach(function (nc) {
+      if (nc < 0 || nc >= cols) return;
+      for (var rr = 0; rr < top; rr++) if (g[rr][nc] === ch) best = Math.max(best, rr);
+    });
+    if (best >= 0) r = best;
+    while (r < 0) { var row = []; for (k = 0; k < cols; k++) row.push("."); g.unshift(row); r++; }
+    if (g.length > MAX_ROWS) return "That's as tall as a fort can go!";
+    g[r][c] = ch; for (k = 1; k < n; k++) g[r][c + k] = "-";
+    setGrid(d, g); return null;
+  }
+  function erasePiece(d, e) {
+    if (e.extra != null) { d.floaters.splice(e.extra, 1); return; }
+    var g = gridOf(d), cl = e.cell;
+    if (g[cl.r]) for (var k = cl.c; k < cl.c + cl.n; k++) g[cl.r][k] = ".";
+    setGrid(d, g);
+  }
+  function toggleGround(d, c, kind) {
+    var cols = zoneCols(d), g = (d.ground || "").split(""), ch = kind === "river" ? "w" : "t";
+    while (g.length < cols) g.push(".");
+    c = clamp(c, 0, cols - 2);
+    if (d.hill >= 0 && c + 2 > d.hill) return "You can't dig into the hill. Flatten it first.";
+    var on = g[c] === ch && g[c + 1] === ch;
+    g[c] = g[c + 1] = on ? "." : ch;
+    d.ground = g.join("").replace(/\.+$/, ""); return null;
+  }
+  function toggleHill(d, c) {
+    c = clamp(c, 2, zoneCols(d) - 2);
+    if (d.hill >= 0 && Math.abs(d.hill - c) <= 1) d.hill = -1;
+    else { d.hill = c; d.ground = (d.ground || "").slice(0, c); }
+    return null;
+  }
+  function pickEnt(w) {
+    var best = null, bd = 10;
+    ents.forEach(function (e) {
+      if (e.dead || !(e.cell || e.extra != null)) return;
+      if (!!build.draft.fortress !== (e.side === "mine")) return;
+      var p = pos(e), s = sprite(e.sprite), hh = e.tile ? e.h : Math.max(e.h, s.height);
+      var dx = Math.max(0, Math.abs(w.x - p.x) - e.w / 2), dy = Math.max(0, Math.abs(w.y - (p.y + e.h / 2 - hh / 2)) - hh / 2), dd = Math.hypot(dx, dy);
+      if (dd < bd || (dd === bd && best && best.type === "block" && e.type !== "block")) { bd = dd; best = e; }
+    });
+    return best;
+  }
+
+  function buildTap(w) {
+    if (!build || !w) return;
+    var d = build.draft, t = build.tool, c = Math.floor((w.x - zoneX(d)) / 16), msg = null, inside = c >= 0 && c < zoneCols(d);
+    snapshot();
+    if (t === "erase") {
+      var e = pickEnt(w);
+      if (e) erasePiece(d, e); else msg = "Nothing to erase there.";
+    } else if (!inside) msg = d.fortress ? "Build your fortress between the dotted posts." : "Build the fort between the dotted posts.";
+    else if (t === "hill") msg = toggleHill(d, c);
+    else if (TOOLS[t]) msg = toggleGround(d, c, t);
+    else {
+      var spent = countPieces(d);
+      if (d.fortress && ALLIES[t] && spent.soldiers >= MAX_SOLDIERS) msg = "That's all " + MAX_SOLDIERS + " of your soldiers!";
+      else if (d.fortress && BLOCKS[t] && spent.coins + blockCost(t) > COINS) msg = "Not enough coins! Erase something to get coins back.";
+      else if (DEFENDERS[t] && DEFENDERS[t].float && !d.fortress) d.floaters.push({ c: clamp(c, 0, zoneCols(d) - 2), type: DEFENDERS[t].key });
+      else msg = placePiece(d, t, c, w);
+    }
+    if (msg) { build.undo.pop(); buildMsg(msg); sfx.zap(); return; }
+    sfx.thud(0.9); rebuild();
+  }
+  function buildHover(w) { if (build) build.hover = w; }
+  function snapshot() { build.undo.push(JSON.stringify(build.draft)); if (build.undo.length > 80) build.undo.shift(); }
+  function rebuild() {
+    var keep = camX, hold = camHoldX, d = build.draft;
+    if (d.fortress) { fortress.mine = d.fort.slice(); loadLevel(-1, fortressLevel()); }
+    else loadLevel(-1, draftLevel(d));
+    camMax = Math.max(0, worldW - bufW); camX = clamp(keep, 0, camMax);
+    if (hold != null) { camHoldX = clamp(hold, 0, camMax); camHoldUntil = Infinity; }
+    placeCamera();
+    if (d.fortress) store("angrydudes.fortress." + pack.id, d.fort); else saveDraft(d);
+    updateBuildTop();
+  }
+  function buildMsg(text) {
+    if (!build) return;
+    if (text) { build.msgUntil = Date.now() + 2600; setText("build-hint", text); setTimeout(function () { if (build && Date.now() >= build.msgUntil) buildMsg(); }, 2700); return; }
+    var t = build.tool, info = toolInfo(t);
+    setText("build-hint", info.hint + (TOOLS[t] || camMax <= 0 ? "" : " Drag to look around."));
+  }
+  function updateBuildTop() {
+    var d = build.draft, n = countPieces(d);
+    setText("build-name", d.fortress ? "Your fortress" : d.name);
+    setText("build-info", d.fortress ? "Coins left: " + (COINS - n.coins) + " of " + COINS + " · Soldiers: " + n.soldiers + " of " + MAX_SOLDIERS
+      : pack.name + " · " + n.pieces + (n.pieces === 1 ? " piece · " : " pieces · ") + n.foes + (n.foes === 1 ? " defender · " : " defenders · ") + n.items + " in your arsenal");
+    $("bt-setup").hidden = !!d.fortress;
+    $("bt-test").textContent = d.fortress ? "Battle!" : "Test it!";
+    $("btn-look-build").hidden = camMax <= 0;
+  }
+
+  // the piece palette along the bottom
+  var TOOL_ART = {
+    erase: function (p) { for (var i = 0; i < 10; i++) { p("#1d1a2b", i + 2, i, 3, 2); p("#1d1a2b", 11 - i, i, 3, 2); } for (i = 0; i < 10; i++) { p("#e0412c", i + 3, i, 1, 1); p("#e0412c", 12 - i, i, 1, 1); } },
+    trench: function (p) { p("#4fae3f", 0, 4, 16, 1); p("#7a5634", 0, 5, 16, 5); p("#3b2a1c", 5, 4, 6, 4); p("#6b4a2b", 5, 4, 1, 4); p("#6b4a2b", 10, 4, 1, 4); },
+    river: function (p) { p("#4fae3f", 0, 4, 16, 1); p("#7a5634", 0, 5, 16, 5); p("#3b2a1c", 4, 4, 8, 5); p("#3f78b5", 4, 5, 8, 4); p("#7fb8e8", 4, 5, 8, 1); },
+    hill: function (p) { p("#4fae3f", 0, 7, 6, 1); p("#7a5634", 0, 8, 6, 2); p("#8d8a82", 6, 2, 10, 8); p("#4fae3f", 6, 1, 10, 1); p("#6f6c66", 8, 5, 5, 1); p("#1d1a2b", 5, 1, 1, 9); }
+  };
+  function toolIcon(t) {
+    var key = "tool:" + t;
+    if (!spriteCache[key]) { var c = document.createElement("canvas"); c.width = 16; c.height = 10; var x = c.getContext("2d"); TOOL_ART[t](function (col, px, py, pw, ph) { x.fillStyle = col; x.fillRect(px, py, pw, ph); }); spriteCache[key] = c; }
+    return key;
+  }
+  function toolInfo(t) {
+    if (TOOLS[t]) return { name: TOOLS[t].name, kind: TOOLS[t].kind, cost: "", icon: toolIcon(t), hint: TOOLS[t].hint };
+    var d = build.draft, P = pieceOf(t), name;
+    if (d.fortress && ALLIES[t]) return { name: P.name, kind: "Soldier", cost: "free", icon: P.sprite, hint: "Tap to put a " + P.name + " in your fortress. Protect your soldiers: if the enemy gets them all, you lose!" };
+    if (BLOCKS[t]) {
+      name = P.boat ? "Ship's hull" : (P.name || cap(P.key)) + (P.slab ? " slab" : "");
+      return { name: name, kind: P.slab ? "Slab" : "Block", cost: d.fortress ? blockCost(t) + (blockCost(t) === 1 ? " coin" : " coins") : "", icon: P.sprite || P.key,
+               hint: P.slab ? "Tap to lay a " + name.toLowerCase() + ". Put two side by side to make a roof or a bridge." : "Tap to drop a " + name.toLowerCase() + " on top of the pile." };
+    }
+    name = P.name || cap(P.key);
+    return { name: name, kind: P.react ? "Fights back" : P.float ? "Floats" : "Enemy", cost: "", icon: P.sprite || P.key,
+             hint: P.float ? "Tap to fly a " + name.toLowerCase() + " high above that spot." : "Tap to put a " + name + " in the fort." };
+  }
+  function buildPalette() {
+    var bar = $("build-bar"), d = build.draft, list = ["erase"];
+    if (d.fortress) list = list.concat(Object.keys(ALLIES));
+    Object.keys(BLOCKS).forEach(function (ch) { if (!(d.fortress && BLOCKS[ch].boat)) list.push(ch); });
+    if (!d.fortress) list = list.concat(Object.keys(DEFENDERS), ["trench", "river", "hill"]);
+    bar.innerHTML = "";
+    list.forEach(function (t) {
+      var info = toolInfo(t), btn = document.createElement("button");
+      btn.className = "item"; btn.type = "button"; btn.title = info.hint;
+      btn.setAttribute("aria-pressed", String(t === build.tool));
+      btn.appendChild(iconCanvas(info.icon, 46, 30));
+      ["nm", "ct", "kd"].forEach(function (cl, i) { var sp = document.createElement("span"); sp.className = cl; sp.textContent = [info.name, info.cost, info.kind][i]; btn.appendChild(sp); });
+      btn.addEventListener("click", function () { build.tool = t; buildPalette(); buildMsg(); });
+      bar.appendChild(btn);
+    });
+  }
+  function drawBuildOverlay(c) {
+    var d = build.draft, x0 = zoneX(d), cols = zoneCols(d), x1 = x0 + cols * 16, y, i, k;
+    // the building zone: a dotted post at each end and a tick under every column
+    for (y = GROUND - 96; y < groundAt(x0 + 1); y += 5) dot(c, x0, y, 1, "#ffd23f");
+    for (y = GROUND - 96; y < groundAt(x1 - 1); y += 5) dot(c, x1, y, 1, "#ffd23f");
+    c.fillStyle = "rgba(255,210,63,0.6)";
+    for (i = 0; i <= cols; i++) c.fillRect(x0 + i * 16, groundAt(x0 + i * 16 + (i === cols ? -1 : 1)) + 2, 1, 3);
+    var h = build.hover, t = build.tool;
+    if (!h) return;
+    var col = Math.floor((h.x - x0) / 16);
+    if (t === "erase") {
+      var e = pickEnt(h); if (!e) return;
+      var p = pos(e), s = sprite(e.sprite), hh = e.tile ? e.h : Math.max(e.h, s.height), ww = e.tile ? e.w : Math.max(e.w, s.width);
+      c.fillStyle = "#e0412c";
+      var L = Math.round(p.x - ww / 2) - 2, T = Math.round(p.y + e.h / 2 - hh) - 2, W = Math.round(ww) + 4, H = Math.round(hh) + 4;
+      c.fillRect(L, T, W, 1); c.fillRect(L, T + H - 1, W, 1); c.fillRect(L, T, 1, H); c.fillRect(L + W - 1, T, 1, H);
+      return;
+    }
+    if (col < 0 || col >= cols) return;
+    if (TOOLS[t]) {
+      var n = t === "hill" ? cols - clamp(col, 2, cols - 2) : 2, cx = t === "hill" ? clamp(col, 2, cols - 2) : clamp(col, 0, cols - 2);
+      c.fillStyle = "rgba(255,210,63,0.45)"; c.fillRect(x0 + cx * 16, groundAt(x0 + cx * 16 + 1) - 3, n * 16, 4);
+      return;
+    }
+    // a see-through copy of the piece where it would land
+    var P = pieceOf(t), w = widthOf(t), ps = sprite(P.sprite || P.key);
+    col = clamp(col, 0, cols - w);
+    var left = x0 + col * 16, top = Infinity, st = stackAt(d, col, w, h);
+    for (k = 0; k < w; k++) top = Math.min(top, groundAt(left + k * 16 + 8));
+    (st.under ? st.below : st.below.concat(st.above)).forEach(function (b) { top = Math.min(top, b.top); });
+    if (P.float) top = groundAt(left) - 96 + P.h / 2;
+    var sw = P.slab ? 16 : ps.width, sh = P.slab ? P.h || 8 : ps.height;
+    c.globalAlpha = 0.55;
+    c.drawImage(ps, 0, 0, sw, sh, Math.round(left + w * 8 - sw / 2 + (P.ox || 0)), Math.round(top - sh), sw, sh);
+    c.globalAlpha = 1;
+  }
+
+  // opening and leaving the builder
+  function openBuilderHome(msg) {
+    build = null; custom = null; fortress = null; mode = "builder";
+    if (pack.levels.indexOf(level) < 0) loadLevel(0);
+    setText("builder-eyebrow", "Level Builder · " + pack.name);
+    setText("builder-msg", msg || "");
+    $("build-import").hidden = true; $("build-share").hidden = true;
+    renderMyLevels(); show("builder");
+  }
+  function renderMyLevels() {
+    var box = $("my-levels"), mine = customLevels().filter(function (d) { return d.pack === pack.id; });
+    box.innerHTML = "";
+    if (!mine.length) { box.innerHTML = '<p class="empty">No levels yet. Press <b>New level</b> to build your first one!</p>'; return; }
+    mine.forEach(function (d) {
+      var row = document.createElement("div"), n = countPieces(d), best = store("angrydudes.best." + pack.id + ".custom-" + d.id) || { stars: 0 };
+      row.className = "my-lvl";
+      row.innerHTML = '<span class="t"><b></b><small></small></span><span class="acts"></span>';
+      row.querySelector("b").textContent = d.name;
+      row.querySelector("small").textContent = (SIZES.filter(function (z) { return z.w === d.width; })[0] || SIZES[1]).name + " · " + n.foes + " defenders · " + n.items + " in the arsenal";
+      if (best.stars) row.querySelector("small").insertAdjacentHTML("beforeend", '<span class="stars" aria-label="' + best.stars + ' of 3 stars">' + starSvg(best.stars > 0) + starSvg(best.stars > 1) + starSvg(best.stars > 2) + "</span>");
+      [["Play", "big", function () { ac(); playDraft(d, false); }], ["Edit", "big alt", function () { ac(); openBuilder(d); }],
+       ["Share", "big alt", function () { shareDraft(d); }], ["Delete", "big alt", null]].forEach(function (a) {
+        var b = document.createElement("button"); b.type = "button"; b.className = a[1]; b.textContent = a[0];
+        b.addEventListener("click", a[2] || function () {
+          if (b.dataset.armed) { deleteDraft(d.id); renderMyLevels(); setText("builder-msg", "Deleted “" + d.name + "”."); return; }
+          b.dataset.armed = "1"; b.textContent = "Tap again";
+          setTimeout(function () { delete b.dataset.armed; b.textContent = "Delete"; }, 3000);
+        });
+        row.querySelector(".acts").appendChild(b);
+      });
+      box.appendChild(row);
+    });
+  }
+  function openBuilder(d) {
+    if (d.pack !== pack.id) usePack(Math.max(0, PACKS.findIndex(function (p) { return p.id === d.pack; })));
+    custom = null; campaign = null;
+    if (!d.fortress) fortress = null;
+    build = { draft: d, tool: d.fortress ? "1" : Object.keys(BLOCKS)[0], undo: [], hover: null, msgUntil: 0 };
+    mode = "build"; camX = 0; camHoldX = null;
+    rebuild(); buildPalette(); show(null); buildMsg(); updateBuildTop();
+  }
+  function leaveBuilder() {
+    var d = build && build.draft;
+    if (d && d.fortress) { build = null; openFortress(); } else openBuilderHome(d ? "Saved “" + d.name + "”." : "");
+  }
+  function testBuild() {
+    var d = build.draft, n = countPieces(d);
+    if (d.fortress) {
+      if (!n.soldiers) { buildMsg("Put at least one soldier in your fortress first!"); return; }
+      build = null; fortress.mine = d.fort.slice(); openIntro(-1, fortressLevel()); return;
+    }
+    if (!n.foes) { buildMsg("Put at least one defender in the fort first!"); return; }
+    if (!n.items) { openSetup(); return; }
+    playDraft(d, true);
+  }
+  function playDraft(d, editing) {
+    if (d.pack !== pack.id) usePack(Math.max(0, PACKS.findIndex(function (p) { return p.id === d.pack; })));
+    var n = countPieces(d);
+    if (!n.foes || !n.items) { openBuilder(d); buildMsg(n.foes ? "Pick an arsenal in Setup first." : "This fort has no defenders yet."); return; }
+    build = null; campaign = null; fortress = null; custom = { draft: d, editing: editing };
+    openIntro(-1, draftLevel(d));
+  }
+  function leaveCustom() { var c = custom; custom = null; if (c.editing) openBuilder(c.draft); else openBuilderHome(); }
+  function surprise() {
+    var d = build.draft, r = rng(Date.now() & 0xffff);
+    snapshot();
+    if (d.fortress) {
+      var guys = ["1", "1", ALLIES["2"] ? "2" : "1", "1"];
+      d.fort = genFort({ cols: MY_COLS, guys: guys, mirror: true, r: r });
+    } else {
+      var cols = zoneCols(d), w = Math.min(cols, 13 + Math.floor(r() * 6)), rows = genFort({ cols: w, guys: enemyGuys(1 + Math.floor(r() * 2), r), strong: r() < 0.5, r: r });
+      d.fort = rows.map(function (row) { return new Array(cols - w + 1).join(".") + row; });
+      d.floaters = []; d.ground = ""; d.hill = -1;
+      var floater = Object.keys(DEFENDERS).filter(function (ch) { return DEFENDERS[ch].float; })[0];
+      if (floater && r() < 0.5) d.floaters.push({ c: cols - 2, type: DEFENDERS[floater].key });
+      d.arsenal = autoArsenal(d);
+    }
+    rebuild(); buildMsg(d.fortress ? "Here's a fortress. Change anything you like!" : "Here's a fort to start from. Change anything you like!");
+  }
+
+  // battle setup: name, size, scenery, wind and the arsenal
+  function autoArsenal(d) {
+    // the README's rule of thumb: about three items for every four defenders, one more for each that fights back, plus two
+    var n = countPieces(d), total = Math.max(4, Math.round(n.foes * 0.75) + n.fighters + 2), a = {}, by = { sling: [], fire: [], drive: [], air: [] };
+    ORDER.forEach(function (k) { by[pack.units[k].kind].push(k); });
+    [["sling", 0.45], ["fire", 0.3], ["drive", 0.1], ["air", 0.15]].forEach(function (s) {
+      var ks = by[s[0]], m = Math.round(total * s[1]);
+      for (var i = 0; i < m && ks.length; i++) { var k = ks[i % Math.min(ks.length, 3)]; a[k] = (a[k] || 0) + 1; }
+    });
+    var have = 0; Object.keys(a).forEach(function (k) { have += a[k]; });
+    if (by.sling.length) a[by.sling[0]] = (a[by.sling[0]] || 0) + Math.max(0, total - have);
+    return a;
+  }
+  function segButtons(id, list, isOn, pick) {
+    var box = $(id); box.innerHTML = "";
+    list.forEach(function (it, i) {
+      var b = document.createElement("button"); b.type = "button"; b.textContent = it.name;
+      b.setAttribute("aria-pressed", String(isOn(it, i)));
+      b.addEventListener("click", function () { pick(it, i); });
+      box.appendChild(b);
+    });
+  }
+  function openSetup() {
+    if (!build) return;
+    renderSetup(); show("build-setup");
+    $("setup-name").value = build.draft.name;
+  }
+  function renderSetup() {
+    var d = build.draft, n = countPieces(d), sugg = Math.max(4, Math.round(n.foes * 0.75) + n.fighters + 2);
+    segButtons("setup-size", SIZES, function (z) { return z.w === d.width; }, function (z) { snapshot(); d.width = z.w; rebuild(); renderSetup(); });
+    segButtons("setup-scene", Object.keys(THEMES).map(function (k) { return { name: cap(k), k: k }; }), function (t) { return t.k === d.theme; },
+      function (t) { snapshot(); d.theme = t.k; rebuild(); renderSetup(); });
+    segButtons("setup-wind", WINDS, function (w) { return w.v === d.wind; }, function (w) { snapshot(); d.wind = w.v; rebuild(); renderSetup(); });
+    setText("setup-sugg", "· " + n.items + " picked. For " + n.foes + (n.foes === 1 ? " defender" : " defenders") + ", about " + sugg + " makes a fair fight.");
+    var box = $("setup-arsenal"); box.innerHTML = "";
+    ORDER.forEach(function (k) {
+      var u = pack.units[k], row = document.createElement("div"), cnt = d.arsenal[k] || 0;
+      row.className = "row";
+      row.appendChild(iconCanvas(unitIcon(u), 36, 24));
+      row.insertAdjacentHTML("beforeend", '<span class="nm"></span><button class="step" type="button">−</button><span class="n"></span><button class="step" type="button">+</button>');
+      row.querySelector(".nm").textContent = u.name; row.querySelector(".nm").insertAdjacentHTML("beforeend", "<small>" + KIND_LABEL[u.kind] + "</small>");
+      var num = row.querySelector(".n"); num.textContent = String(cnt); num.classList.toggle("zero", !cnt);
+      var bs = row.querySelectorAll(".step");
+      bs[0].setAttribute("aria-label", "One less " + u.name); bs[1].setAttribute("aria-label", "One more " + u.name);
+      bs[0].addEventListener("click", function () { setCount(k, (d.arsenal[k] || 0) - 1); });
+      bs[1].addEventListener("click", function () { setCount(k, (d.arsenal[k] || 0) + 1); });
+      box.appendChild(row);
+    });
+    function setCount(k, v) { v = clamp(v, 0, 9); if (v) d.arsenal[k] = v; else delete d.arsenal[k]; saveDraft(d); renderSetup(); updateBuildTop(); }
+  }
+  function closeSetup() {
+    var d = build.draft, name = $("setup-name").value.replace(/\s+/g, " ").trim().slice(0, 28);
+    if (name) d.name = name;
+    saveDraft(d); show(null); updateBuildTop(); buildMsg();
+  }
+
+  // sharing: a level travels as a short code (or a link with the code in it)
+  function encodeDraft(d) {
+    var j = JSON.stringify({ v: 1, p: d.pack, n: d.name, w: d.width, t: d.theme, i: d.wind, f: d.fort, g: d.ground || "", h: d.hill, l: d.floaters || [], a: d.arsenal || {} });
+    return "AD1-" + btoa(unescape(encodeURIComponent(j))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function decodeDraft(code) {
+    // codes come from other people, so everything is checked against the pack before it's used
+    var m = String(code || "").replace(/\s+/g, "").match(/AD1-([A-Za-z0-9_-]+)/);
+    if (!m) return null;
+    var o;
+    try { var b = m[1].replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "="; o = JSON.parse(decodeURIComponent(escape(atob(b)))); } catch (err) { return null; }
+    var P = PACKS.filter(function (x) { return x.id === o.p; })[0];
+    if (!P || !Array.isArray(o.f) || o.f.length > MAX_ROWS) return null;
+    var chars = Object.keys(P.blocks).concat(Object.keys(P.defenders), [".", "-"]);
+    if (!o.f.every(function (row) { return typeof row === "string" && row.length <= 60 && row.split("").every(function (ch) { return chars.indexOf(ch) >= 0; }); })) return null;
+    var d = { id: Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), pack: P.id, name: String(o.n || "Shared battle").slice(0, 28),
+              width: SIZES.some(function (z) { return z.w === o.w; }) ? o.w : 900, theme: P.themes[o.t] ? o.t : P.levels[0].theme,
+              wind: WINDS.some(function (w) { return w.v === o.i; }) ? o.i : 2, fort: o.f, ground: String(o.g || "").replace(/[^.tw]/g, ".").slice(0, 60),
+              hill: typeof o.h === "number" && o.h >= 0 && o.h < 60 ? Math.floor(o.h) : -1, floaters: [], arsenal: {} };
+    (Array.isArray(o.l) ? o.l : []).slice(0, 10).forEach(function (f) {
+      var ch = Object.keys(P.defenders).filter(function (c) { return P.defenders[c].key === f.type && P.defenders[c].float; })[0];
+      if (ch && typeof f.c === "number") d.floaters.push({ c: clamp(Math.floor(f.c), 0, 58), type: f.type });
+    });
+    Object.keys(o.a || {}).forEach(function (k) { if (P.units[k] && typeof o.a[k] === "number") d.arsenal[k] = clamp(Math.floor(o.a[k]), 0, 9); });
+    var cols = zoneCols(d);
+    d.fort = d.fort.map(function (row) { return row.slice(0, cols); });
+    return d;
+  }
+  function shareDraft(d) {
+    var code = encodeDraft(d);
+    $("build-share").hidden = false; $("share-code").value = code;
+    setText("share-title", "Share “" + d.name + "”");
+    $("btn-share-copy").onclick = function () { copyText(code, "Code copied!"); };
+    $("btn-share-link").onclick = function () { copyText(location.href.split("#")[0] + "#level=" + code, "Link copied!"); };
+    $("build-share").scrollIntoView({ block: "nearest" });
+  }
+  function copyText(t, done) {
+    function fallback() { var a = $("share-code"); a.value = t; a.select(); try { document.execCommand("copy"); setText("builder-msg", done); } catch (err) { setText("builder-msg", "Select the code and copy it."); } }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { setText("builder-msg", done); }, fallback);
+    else fallback();
+  }
+  function importCode(code) {
+    var d = decodeDraft(code);
+    if (!d) return null;
+    saveDraft(d);
+    if (d.pack !== pack.id) usePack(Math.max(0, PACKS.findIndex(function (p) { return p.id === d.pack; })));
+    return d;
+  }
+
+  /* ------------------------------------------------------ fortress battle */
+  // Your fortress on the left, theirs on the right, and you take turns. The enemy aims like the play-test bot:
+  // it works out the shot that would hit one of your soldiers, then wobbles it more or less depending on how
+  // tough you picked. Each side's shots fly straight through its own fort (collision categories MINE / THEIRS).
+  var DIFFS = [{ name: "Easy", aim: [8, 0.1], tough: 1, guns: 1 }, { name: "Normal", aim: [5, 0.065], tough: 1, guns: 2 }, { name: "Hard", aim: [2.2, 0.03], tough: 1.25, guns: 9 }];
+  var fortress = null;      // { diff, mine, enemy, theme, gravity, turn, soldiers }
+  function fortressDiff() { var v = store("angrydudes.fortress.diff"); return typeof v === "number" ? clamp(v, 0, 2) : 1; }
+  function savedFortress() { var f = store("angrydudes.fortress." + pack.id); return Array.isArray(f) && f.some(function (row) { return /[1-4]/.test(row); }) ? f : null; }
+  function freshFortress(mine) {
+    var L = pack.levels[Math.floor(Math.random() * pack.levels.length)], diff = fortressDiff(), r = rng(Date.now() & 0xffff);
+    fortress = { diff: diff, mine: mine, enemy: genFort({ cols: MY_COLS, guys: enemyGuys(diff, r), strong: diff > 0, r: r }),
+                 theme: L.theme, gravity: L.gravity || 1, turn: "me", soldiers: 0 };
+    return fortress;
+  }
+  function fortressLevel() {
+    var F = fortress, D = DIFFS[F.diff];
+    return { id: "fortress", name: "Fortress Battle", date: D.name + " enemy · " + pack.side + " vs. " + pack.foe, theme: F.theme, gravity: F.gravity, width: FORT_W, fortress: true,
+      history: "Your fortress is on the left and theirs is on the right. You take turns: you fire at their fort, then they fire back at yours. Knock out all their defenders before they knock out all your soldiers!",
+      tip: "Your own shots fly straight through your fortress, so fire away. Every soldier still standing at the end is worth bonus points.",
+      fortX: FORT_W - MY_X - MY_COLS * 16, fort: F.enemy, myFortX: MY_X, myFort: F.mine.length ? F.mine : ["."],
+      arsenal: fortressArsenal(), wind: 2, toughness: D.tough };
+  }
+  function fortressArsenal() {
+    var a = {}, seen = { sling: 0, fire: 0, drive: 0, air: 0 }, give = { sling: [4, 2, 1, 1], fire: [3, 2, 1, 1], drive: [1, 1], air: [1, 1] };
+    ORDER.forEach(function (k) { var u = pack.units[k], n = give[u.kind][seen[u.kind]++]; if (n) a[k] = n; });
+    return a;
+  }
+  function openFortress() {
+    build = null; custom = null; campaign = null; mode = "fortress-menu";
+    if (pack.levels.indexOf(level) < 0) loadLevel(0);
+    var saved = savedFortress();
+    setText("fort-eyebrow", "Fortress Battle · " + pack.side + " vs. " + pack.foe);
+    segButtons("fort-diff", DIFFS, function (d, i) { return i === fortressDiff(); }, function (d, i) { store("angrydudes.fortress.diff", i); openFortress(); });
+    $("btn-fort-mine").hidden = !saved;
+    $("btn-fort-build").textContent = saved ? "Change my fortress" : "Build my fortress";
+    setText("fort-note", ["The enemy is a bad shot and its fort is small. A good place to start!",
+      "The enemy aims pretty well, and some defenders fight back.", "The enemy hardly ever misses, its defenders are 25% tougher, and it has its biggest guns."][fortressDiff()] +
+      (saved ? "" : " You get " + COINS + " coins to build with, and up to " + MAX_SOLDIERS + " soldiers to guard it."));
+    show("fortress");
+  }
+  function buildFortress() {
+    freshFortress((savedFortress() || []).slice());
+    openBuilder({ fortress: true, pack: pack.id, fort: fortress.mine.slice() });
+  }
+  function fightFortress(quick) {
+    var mine = quick ? genFort({ cols: MY_COLS, guys: ["1", "1", ALLIES["2"] ? "2" : "1", "1"], mirror: true, strong: true, r: rng(Date.now() & 0xffff) }) : savedFortress();
+    freshFortress(mine); openIntro(-1, fortressLevel());
+  }
+  function newEnemyFort() { freshFortress(fortress.mine); openIntro(-1, fortressLevel()); }
+
+  // A fort maker, for enemy forts, quick-battle fortresses and "Surprise me": towers of blocks with rooms between
+  // them, slab roofs across the towers, and the guys inside and on the roofs. mirror flips it to face right.
+  function fortBlocks(strong) {
+    // the blocks this pack's own forts use most, so a made-up fort looks like it belongs to the war
+    var used = {};
+    pack.levels.forEach(function (L) { L.fort.join("").split("").forEach(function (ch) { used[ch] = (used[ch] || 0) + 1; }); });
+    function often(a, b) { return (used[b] || 0) - (used[a] || 0); }
+    var plain = Object.keys(BLOCKS).filter(function (ch) { var b = BLOCKS[ch]; return !b.slab && !b.fixed && !b.sensor && !b.explodes && !b.boat && (b.w || 16) === 16 && (b.h || 16) === 16; })
+      .sort(often).slice(0, 3).sort(function (a, b) { return BLOCKS[a].hp - BLOCKS[b].hp; });
+    var slabs = Object.keys(BLOCKS).filter(function (ch) { return BLOCKS[ch].slab && !BLOCKS[ch].boat && !BLOCKS[ch].h; }).sort(often);
+    var top = plain[plain.length - 1], mid = plain[Math.floor((plain.length - 1) / 2)];
+    return { wall: strong ? top : mid, mid: mid, fill: plain[0], slab: slabs[0] };
+  }
+  function enemyGuys(diff, r) {
+    var ok = Object.keys(DEFENDERS).filter(function (ch) { var d = DEFENDERS[ch]; return !d.float && (d.cells || 1) <= 3 && d.h <= 28 && !d.explodes; });
+    var plain = ok.filter(function (ch) { return !DEFENDERS[ch].react; }).sort(function (a, b) { return DEFENDERS[a].pts - DEFENDERS[b].pts; });
+    var fight = ok.filter(function (ch) { return DEFENDERS[ch].react; }), out = [], i;
+    for (i = 0; i < diff && fight.length; i++) out.push(fight[Math.floor(r() * fight.length)]);
+    if (diff > 0 && plain.length > 1) out.push(plain[plain.length - 1]);
+    while (out.length < 3 + diff && plain.length) out.push(plain[Math.floor(r() * Math.max(1, plain.length - 1))]);
+    return out;
+  }
+  function genFort(o) {
+    var N = o.cols, r = o.r, B = fortBlocks(o.strong), H = 2 + (r() < 0.45 ? 1 : 0), R = H + 3, g = [], i, c, k;
+    for (i = 0; i < R; i++) { g.push([]); for (c = 0; c < N; c++) g[i].push("."); }
+    var bottom = R - 1, roof = R - 1 - H, onRoof = roof - 1, towers = [];
+    for (c = 0; c < N;) {
+      var tw = r() < 0.25 && c + 2 <= N ? 2 : 1, rw = 2 + (r() < 0.5 ? 1 : 0);
+      towers.push([c, tw]); c += tw;
+      if (c + rw + 1 > N) break;
+      c += rw;
+    }
+    towers.forEach(function (t) { for (k = t[0]; k < t[0] + t[1]; k++) for (var h = 0; h < H; h++) g[bottom - h][k] = h === 0 || r() < 0.5 ? B.wall : B.mid; });
+    var slots = [];
+    for (i = 0; i + 1 < towers.length; i++) {
+      var a = towers[i][0], b = towers[i + 1][0] + towers[i + 1][1] - 1;
+      for (k = a; k <= b; k++) g[roof][k] = B.slab;
+      slots.push({ row: bottom, c0: a + towers[i][1], c1: towers[i + 1][0] - 1 });
+    }
+    slots = slots.concat(slots.map(function (s) { return { row: onRoof, c0: s.c0, c1: s.c1 }; }));
+    function fits(row, c0, n) { for (var q = c0; q < c0 + n; q++) if (q >= N || g[row][q] !== ".") return false; return true; }
+    o.guys.forEach(function (ch) {
+      var n = widthOf(ch), tries = slots.filter(function (s) { return s.c1 - s.c0 + 1 >= n; });
+      for (var t = 0; t < tries.length; t++) {
+        var s = tries[t], spots = [];
+        for (var q = s.c0; q + n - 1 <= s.c1; q++) if (fits(s.row, q, n)) spots.push(q);
+        if (!spots.length) continue;
+        var at = spots[Math.floor(r() * spots.length)];
+        g[s.row][at] = ch; for (q = 1; q < n; q++) g[s.row][at + q] = "-";
+        return;
+      }
+    });
+    // sandbags in the empty corners of the rooms and battlements on the towers
+    slots.forEach(function (s) { if (s.row === bottom) for (var q = s.c0; q <= s.c1; q++) if (g[bottom][q] === "." && r() < 0.35) g[bottom][q] = B.fill; });
+    towers.forEach(function (t) { if (r() < 0.55 && g[onRoof][t[0]] === ".") g[onRoof][t[0]] = B.fill; });
+    if (o.mirror) g.forEach(function (row) {
+      row.reverse();
+      // a wide piece reads left to right, so after flipping its "-" cells come first: move the piece back in front of them
+      for (var q = 0; q < row.length; q++) if (row[q] === "-") { var e = q; while (row[e] === "-") e++; row[q] = row[e]; for (var z = q + 1; z <= e; z++) row[z] = "-"; q = e; }
+    });
+    var rows = g.map(function (row) { return row.join(""); });
+    while (rows.length && /^\.*$/.test(rows[0])) rows.shift();
+    return rows;
+  }
+
+  // their turn
+  function enemyTurn() {
+    fortress.turn = "them"; phase = "enemy"; newWind();
+    camHoldX = camMax; camHoldUntil = simT + 1300;
+    updateHud(); updateHint(); buildBar();
+    scheduled.push({ at: simT + 1500, run: enemyFire });
+  }
+  function enemyWeapons() {
+    var list = [], guns = 0, plain = Object.keys(DEFENDERS).map(function (c) { return DEFENDERS[c]; })
+      .filter(function (d) { return !d.react && !d.float && (d.cells || 1) === 1 && d.h <= 20; }).sort(function (a, b) { return a.hp - b.hp; })[0];
+    if (plain) list.push({ kind: "sling", w: 2, spec: { key: "enemy_" + plain.key, name: plain.name, sprite: plain.sprite || plain.key, w: Math.min(plain.w, 14), h: Math.min(plain.h, 18), density: 0.0035, enemy: true } });
+    ORDER.forEach(function (k) {
+      var u = pack.units[k], c = {};
+      if (u.kind !== "fire" || guns >= DIFFS[fortress.diff].guns) return;
+      guns++;
+      Object.keys(u).forEach(function (f) { c[f] = u[f]; });
+      c.enemy = true; c.key = "enemy_" + k; delete c.best; delete c.tap;
+      list.push({ kind: "fire", w: 1, spec: c });
+    });
+    return list;
+  }
+  function flightY(from, vx, vy, lift, tx) {
+    var px = from.x * PH, py = from.y * PH, g = GRAV * gravK * (1 - lift);
+    for (var i = 0; i < 2500; i++) {
+      vy += g; vx *= 0.998; vy *= 0.998; px += vx; py += vy;
+      if (px / PH <= tx) return py / PH;
+      if (py / PH > WORLD_H + 40) return null;
+    }
+    return null;
+  }
+  function enemyAim(W, from, t) {
+    var D = DIFFS[fortress.diff], u = W.spec, k = W.kind === "fire" ? u.speed || 1 : 1, lift = W.kind === "fire" ? u.lift || 0 : 0, ang, p = 1;
+    if (lift >= 1) ang = Math.atan2(from.y - (t.y - 4), from.x - t.x);
+    else {
+      ang = (lift > 0.9 ? 5 + Math.random() * 9 : 32 + Math.random() * 24) * Math.PI / 180;
+      var lo = 0.15, hi = 1;
+      for (var i = 0; i < 22; i++) {
+        p = (lo + hi) / 2;
+        var y = flightY(from, -Math.cos(ang) * topSpeed * p * k, -Math.sin(ang) * topSpeed * p * k, lift, t.x);
+        if (y === null || y > t.y - 6) lo = p; else hi = p;
+      }
+      p = (lo + hi) / 2;
+    }
+    ang += (Math.random() * 2 - 1) * D.aim[0] * Math.PI / 180;
+    p = Math.min(1, p * (1 + (Math.random() * 2 - 1) * D.aim[1]));
+    return { x: -Math.cos(ang) * topSpeed * p * k, y: -Math.sin(ang) * topSpeed * p * k };
+  }
+  function enemyFire() {
+    if (mode !== "play" || phase !== "enemy") return;
+    var mine = allies();
+    if (!mine.length) { finishTurn(); return; }
+    var list = enemyWeapons(), total = 0, pick = 0, W, i;
+    list.forEach(function (x) { total += x.w; });
+    pick = Math.random() * total;
+    for (i = 0; i < list.length; i++) { pick -= list[i].w; if (pick <= 0) break; }
+    W = list[Math.min(i, list.length - 1)];
+    var from = W.kind === "sling" ? { x: worldW - SLING.x, y: SLING.y } : { x: worldW - BUNKER.x, y: BUNKER.y };
+    var v = enemyAim(W, from, pos(mine[Math.floor(Math.random() * mine.length)])), group = [];
+    if (W.kind === "sling") { group.push(spawnTroop(W.spec, from.x, from.y, v.x, v.y, { side: "them", trail: false })); sfx.twang(); }
+    else {
+      var n = W.spec.spread ? W.spec.spread.n : 1, st = W.spec.spread ? W.spec.spread.deg * Math.PI / 180 : 0;
+      for (i = 0; i < n; i++) {
+        var a = (i - (n - 1) / 2) * st, c = Math.cos(a), s = Math.sin(a);
+        group.push(spawnProj(W.spec, from.x, from.y - i, v.x * c - v.y * s, v.x * s + v.y * c, { side: "them" }));
+      }
+      muzzle(from.x - 4, from.y); play(W.spec.sound || "thump");
+    }
+    begin(group); active.enemy = true;
+    say("FIRE!", from.x, from.y - 30, "#ff8c6a");
+    updateHint();
+  }
+
+  /* ------------------------------------------------------- menu buttons */
+  function buildModes() {
+    var box = $("modes"), mine = customLevels().filter(function (d) { return d.pack === pack.id; }).length;
+    box.innerHTML = "";
+    [["build", "Level Builder", (mine ? mine + (mine === 1 ? " level" : " levels") + " saved · " : "") + "Build your own " + pack.name + " battle",
+      BLOCKS[Object.keys(BLOCKS)[0]].sprite || BLOCKS[Object.keys(BLOCKS)[0]].key, function () { ac(); openBuilderHome(); }],
+     ["fort", "Fortress Battle", "Your fort vs. theirs: take turns firing!", pack.icon, function () { ac(); openFortress(); }]].forEach(function (m) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "mode-btn " + m[0];
+      b.appendChild(iconCanvas(m[3], 40, 32));
+      var t = document.createElement("b"); t.textContent = m[1]; b.appendChild(t);
+      var s = document.createElement("small"); s.textContent = m[2]; b.appendChild(s);
+      b.addEventListener("click", m[4]);
+      box.appendChild(b);
+    });
+  }
+  $("btn-build-new").addEventListener("click", function () { ac(); var d = newDraft(); saveDraft(d); openBuilder(d); });
+  $("btn-build-import").addEventListener("click", function () { $("build-import").hidden = !$("build-import").hidden; if (!$("build-import").hidden) $("import-code").focus(); });
+  $("btn-import-go").addEventListener("click", function () {
+    var d = importCode($("import-code").value);
+    if (!d) { setText("builder-msg", "That code didn't work. Check that you copied all of it."); return; }
+    $("import-code").value = ""; openBuilderHome("Added “" + d.name + "” to your levels!");
+  });
+  $("btn-build-back").addEventListener("click", toMenu);
+  $("bt-setup").addEventListener("click", openSetup);
+  $("bt-undo").addEventListener("click", function () { if (!build || !build.undo.length) { buildMsg("Nothing to undo."); return; } build.draft = JSON.parse(build.undo.pop()); rebuild(); buildPalette(); });
+  $("bt-surprise").addEventListener("click", surprise);
+  $("bt-clear").addEventListener("click", function () { snapshot(); build.draft.fort = []; build.draft.floaters = []; build.draft.ground = ""; build.draft.hill = -1; rebuild(); buildMsg("All clear. Press Undo to bring it back."); });
+  $("bt-test").addEventListener("click", function () { ac(); testBuild(); });
+  $("bt-done").addEventListener("click", leaveBuilder);
+  $("btn-look-build").addEventListener("click", function () { camHoldX = camX > camMax / 2 ? 0 : camMax; camHoldUntil = Infinity; $("btn-look-build").textContent = camHoldX ? "Back to start" : "See fort"; });
+  $("btn-setup-done").addEventListener("click", closeSetup);
+  $("btn-setup-auto").addEventListener("click", function () { build.draft.arsenal = autoArsenal(build.draft); saveDraft(build.draft); renderSetup(); updateBuildTop(); });
+  $("btn-fort-build").addEventListener("click", function () { ac(); buildFortress(); });
+  $("btn-fort-mine").addEventListener("click", function () { ac(); fightFortress(false); });
+  $("btn-fort-quick").addEventListener("click", function () { ac(); fightFortress(true); });
+  $("btn-fort-back").addEventListener("click", toMenu);
+
   $("btn-start").addEventListener("click", startBattle);
   $("btn-look").addEventListener("click", function () { lookAtFort(!(camHoldX != null && camHoldX > camMax / 2)); });
   $("btn-back").addEventListener("click", leaveBattle);
-  $("btn-restart").addEventListener("click", function () { loadLevel(levelIndex); startBattle(); });
+  $("btn-restart").addEventListener("click", function () { reloadLevel(); startBattle(); });
   $("btn-menu").addEventListener("click", leaveBattle);
-  $("btn-retry").addEventListener("click", function () { loadLevel(levelIndex); startBattle(); });
-  $("btn-next").addEventListener("click", function () { if (campaign) openCampaign(); else openIntro(levelIndex + 1); });
+  $("btn-retry").addEventListener("click", function () { reloadLevel(); startBattle(); });
+  $("btn-next").addEventListener("click", function () { if (campaign) openCampaign(); else if (fortress) newEnemyFort(); else openIntro(levelIndex + 1); });
   $("btn-result-menu").addEventListener("click", leaveBattle);
   $("btn-camp-fight").addEventListener("click", function () { ac(); startMission(campSel); });
   $("btn-camp-back").addEventListener("click", toMenu);
@@ -1725,7 +2557,8 @@
   var acc = 0, last = performance.now();
   function step() {
     simT += STEP;
-    if (level) {
+    if (level && mode === "build") updateCamera();
+    else if (level) {
       updateEnts();
       Engine.update(engine, STEP);
       afterPhysics();
@@ -1753,9 +2586,16 @@
 
   // Testing aid: inspect state, or fast-forward the simulation when a browser throttles frames.
   window.ANGRY_DEBUG = {
-    get state() { return { pack: pack.id, level: level && level.id, mode: mode, phase: phase, selected: selected, arsenal: arsenal, score: score, defenders: defendersLeft(), ents: ents.length, wind: wind, topSpeed: topSpeed, gravity: gravK }; },
+    get state() { return { pack: pack.id, level: level && level.id, mode: mode, phase: phase, selected: selected, arsenal: arsenal, score: score, defenders: defendersLeft(), allies: allies().length, turn: fortress && fortress.turn, ents: ents.length, wind: wind, topSpeed: topSpeed, gravity: gravK }; },
     advance: function (ms) { for (var i = 0; i < Math.round(ms / STEP); i++) step(); draw(); updateHud(); return this.state; },
-    open: function (packId, levelNo) { var i = PACKS.findIndex(function (p) { return p.id === packId; }); campaign = null; usePack(i); openIntro(levelNo || 0); startBattle(); this.advance(1500); return this.state; },
+    open: function (packId, levelNo) { var i = PACKS.findIndex(function (p) { return p.id === packId; }); campaign = null; fortress = null; custom = null; build = null; usePack(i); openIntro(levelNo || 0); startBattle(); this.advance(1500); return this.state; },
+    // fortress(pack, difficulty 0-2): a quick fortress battle; builder(pack, draft?) opens the level builder
+    fortress: function (packId, diff) { usePack(PACKS.findIndex(function (p) { return p.id === packId; })); store("angrydudes.fortress.diff", diff == null ? 1 : diff); fightFortress(true); startBattle(); this.advance(1500); return this.state; },
+    builder: function (packId, d) { usePack(PACKS.findIndex(function (p) { return p.id === packId; })); d = d || newDraft(); saveDraft(d); openBuilder(d); return d; },
+    tapAt: function (x, y) { buildTap({ x: x, y: y }); return build && build.draft; },
+    tool: function (t) { build.tool = t; buildPalette(); return t; },
+    get build() { return build; },
+    encode: function (d) { return encodeDraft(d); }, decode: function (c) { return decodeDraft(c); },
     mission: function (packId, k) { var i = PACKS.findIndex(function (p) { return p.id === packId; }); usePack(i); startMission(k); startBattle(); this.advance(1500); return this.state; },
     map: function (packId) { var i = PACKS.findIndex(function (p) { return p.id === packId; }); campaign = null; usePack(i); openCampaign(); return campState(pack); },
     // use(key, angle°, power 0–1) for sling/fire, use(key, targetX) for air, use(key) for vehicles
@@ -1785,6 +2625,13 @@
   var saved = store("angrydudes.pack");
   usePack(Math.max(0, PACKS.findIndex(function (p) { return p.id === saved; })));
   loadLevel(0); buildMenu(); show("menu");
+  // a shared level link: index.html#level=AD1-...
+  var hashCode = /[#&]level=([^&]+)/.exec(location.hash);
+  if (hashCode) {
+    var shared = importCode(decodeURIComponent(hashCode[1]));
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (err) { /* file:// pages */ }
+    openBuilderHome(shared ? "Added \u201c" + shared.name + "\u201d to your levels! Press Play to try it." : "That level link didn't work.");
+  }
   if (document.fonts && document.fonts.load) document.fonts.load('8px "Press Start 2P"');
   requestAnimationFrame(frame);
 })();

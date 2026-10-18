@@ -25,24 +25,25 @@ button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 #screen{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
 
-/* HUD */
-.hud{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;
+/* HUD (the level builder's top bar and piece dock share these looks) */
+.hud,.btop{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;
   padding-top:max(8px, env(safe-area-inset-top, 0px));padding-bottom:8px;
   padding-left:max(12px, env(safe-area-inset-left, 0px));padding-right:max(12px, env(safe-area-inset-right, 0px));
   background:linear-gradient(rgba(12,15,10,.82), rgba(12,15,10,.55));border-bottom:2px solid var(--edge);pointer-events:none}
-.hud > *{pointer-events:auto}
-.hud .where{display:flex;flex-direction:column;line-height:1.1;min-width:0}
-.hud .where b{font-family:var(--font-pixel);font-weight:700;font-size:18px}
-.hud .where span{font-size:12px;color:var(--muted)}
+.hud > *, .btop > *{pointer-events:auto}
+.hud .where, .btop .where{display:flex;flex-direction:column;line-height:1.1;min-width:0}
+.hud .where b, .btop .where b{font-family:var(--font-pixel);font-weight:700;font-size:18px}
+.hud .where span, .btop .where span{font-size:12px;color:var(--muted)}
 .hud .stat{display:flex;align-items:baseline;gap:6px;font-family:var(--font-pixel);font-size:15px}
 .hud .stat small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 #score{font-family:var(--font-display);font-size:13px;color:var(--gold);font-variant-numeric:tabular-nums}
-.hud .grow{flex:1}
+.hud .grow, .btop .grow{flex:1}
+.pxbtn.go{background:var(--gold);color:#1d1a2b}
 .pxbtn{font-family:var(--font-pixel);font-weight:600;font-size:14px;padding:4px 10px;background:var(--panel-2);border:2px solid var(--edge);box-shadow:2px 2px 0 var(--edge)}
 .pxbtn:active{transform:translate(2px,2px);box-shadow:none}
 
 /* arsenal dock */
-.dock{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:3px solid var(--edge);
+.dock,.bdock{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:3px solid var(--edge);
   padding-bottom:max(8px, env(safe-area-inset-bottom, 0px))}
 .hint{margin:0;padding:6px max(12px, env(safe-area-inset-right, 0px)) 6px max(12px, env(safe-area-inset-left, 0px));
   font-family:var(--font-pixel);font-size:15px;color:var(--gold);min-height:32px;background:var(--ink);border-bottom:2px solid var(--edge);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -57,6 +58,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .item:disabled{opacity:.35;cursor:default}
 
 body:not(.playing) .hud, body:not(.playing) .dock{display:none}
+body:not(.building) .btop, body:not(.building) .bdock{display:none}
 
 /* overlays */
 .overlay{position:fixed;inset:0;display:grid;place-items:center;overflow:auto;background:rgba(8,10,6,.72);
@@ -119,8 +121,16 @@ body:not(.playing) .hud, body:not(.playing) .dock{display:none}
 .camp-banner small{grid-column:2;color:var(--fg);font-size:13px}
 .camp-banner .go{grid-row:span 2;grid-column:3;font-family:var(--font-display);font-size:11px;padding:8px 10px;background:var(--gold);color:#1d1a2b;border:2px solid var(--edge)}
 .panel.wide{width:min(1060px, 100%)}
+.camp-like{font-family:var(--font-display);font-weight:400;font-size:clamp(18px, 3.2vw, 26px);line-height:1.3;margin:8px 0 6px}
 .camp h2{font-family:var(--font-display);font-weight:400;font-size:clamp(18px, 3.2vw, 26px);line-height:1.3;margin:8px 0 6px}
 .camp .lede{margin-bottom:14px}
+.chapters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.chap{display:flex;flex-direction:column;align-items:flex-start;line-height:1.1;padding:6px 12px;text-align:left;background:var(--panel-2);border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge)}
+.chap small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chap b{font-family:var(--font-pixel);font-size:16px;font-weight:700}
+.chap.done b{color:var(--gold)}
+.chap[aria-pressed="true"]{background:var(--raised);outline:3px solid var(--gold);outline-offset:-1px}
+.chap:disabled{opacity:.4;cursor:default}
 .camp-grid{display:grid;grid-template-columns:minmax(0, 2fr) minmax(230px, 1fr);gap:16px;align-items:start;margin:0 0 16px}
 @media (max-width: 760px){ .camp-grid{grid-template-columns:1fr} }
 .map-wrap{position:relative;border:4px solid var(--edge);box-shadow:5px 5px 0 var(--edge);background:#203c58;line-height:0}
@@ -166,12 +176,49 @@ body:not(.playing) .hud, body:not(.playing) .dock{display:none}
 .card:disabled:not([aria-pressed="true"]){opacity:.4;cursor:default}
 .big:disabled{opacity:.45;cursor:default}
 
+/* main menu: the two make-your-own modes */
+.modes{display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:10px;margin:0 0 14px}
+.mode-btn{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px 12px;text-align:left;padding:10px 14px;border:3px solid var(--edge);box-shadow:4px 4px 0 var(--edge)}
+.mode-btn canvas{image-rendering:pixelated;grid-row:span 2}
+.mode-btn b{font-family:var(--font-pixel);font-size:18px;font-weight:700;line-height:1.1}
+.mode-btn small{font-size:12px;color:var(--fg);opacity:.85}
+.mode-btn.build{background:linear-gradient(90deg, #1f3a52, #1d2a33)}
+.mode-btn.fort{background:linear-gradient(90deg, #52241f, #33201d)}
+.mode-btn:hover{filter:brightness(1.15)}
+/* level builder screens */
+.lbl{margin:14px 0 6px;font-family:var(--font-pixel);font-weight:600;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.lbl small{letter-spacing:0;text-transform:none;font-family:var(--font-body);font-size:12px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font-family:var(--font-pixel);font-weight:600;font-size:14px;padding:6px 12px;background:var(--panel-2);border:2px solid var(--edge);box-shadow:2px 2px 0 var(--edge)}
+.seg button[aria-pressed="true"]{background:var(--raised);outline:3px solid var(--gold);outline-offset:-1px}
+.field{display:grid;gap:6px;margin:8px 0 0}
+.field span{font-family:var(--font-pixel);font-weight:600;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field input, .import textarea, .share textarea{font:500 16px var(--font-body);color:var(--fg);background:var(--ink);border:2px solid var(--edge);padding:8px 10px;width:100%;-webkit-user-select:text;user-select:text}
+.field input{max-width:360px}
+.arsenal-edit{display:grid;grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));gap:6px;margin:0 0 16px}
+.arsenal-edit .row{display:grid;grid-template-columns:40px 1fr auto auto auto;align-items:center;gap:6px;padding:4px 6px;background:var(--panel-2);border:2px solid var(--edge)}
+.arsenal-edit canvas{image-rendering:pixelated;justify-self:center}
+.arsenal-edit .nm{font-family:var(--font-pixel);font-size:14px;line-height:1.1}
+.arsenal-edit .nm small{display:block;font-family:var(--font-body);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.arsenal-edit .n{font-family:var(--font-display);font-size:11px;color:var(--gold);min-width:16px;text-align:center}
+.arsenal-edit .n.zero{color:var(--muted)}
+.step{width:30px;height:30px;padding:0;font-family:var(--font-display);font-size:12px;background:var(--raised);border:2px solid var(--edge)}
+.my-lvl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 12px;padding:10px 12px;background:var(--panel-2);border:3px solid var(--edge);box-shadow:4px 4px 0 var(--edge)}
+.my-lvl .t b{display:block;font-family:var(--font-pixel);font-size:18px;font-weight:700;line-height:1.1;overflow-wrap:anywhere}
+.my-lvl .t small{color:var(--muted);font-size:12px}
+.my-lvl .acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.my-lvl .stars{display:inline-flex;gap:2px;vertical-align:middle;margin-left:6px}
+.my-lvl .stars .star{width:14px;height:14px}
+.empty{color:var(--muted);font-size:14px;padding:10px 12px;border:2px dashed #39412e}
+.import, .share{display:grid;gap:8px;margin:12px 0 0}
+.share textarea{font:12px ui-monospace, monospace;word-break:break-all}
+.note.small{font-size:13px;margin:0;color:var(--muted)}
 .rotate{position:fixed;inset:0;display:none;place-items:center;text-align:center;padding:24px;background:var(--ink);font-family:var(--font-pixel);font-size:20px}
-@media (orientation: portrait) and (max-width: 700px){ body.playing .rotate{display:grid} }
+@media (orientation: portrait) and (max-width: 700px){ body.playing .rotate, body.building .rotate{display:grid} }
 .boot-error{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;font-family:var(--font-pixel);font-size:18px;background:var(--ink)}
 @media (max-height: 430px){
-  .hud{padding-bottom:4px}
-  .hud .where span{display:none}
+  .hud, .btop{padding-bottom:4px}
+  .hud .where span, .btop .where span{display:none}
   .hint{min-height:26px;padding-block:3px;font-size:13px}
   .item{width:84px;grid-template-rows:28px auto auto;padding:4px 3px}
   .item .kd{display:none}
@@ -199,12 +246,30 @@ body:not(.playing) .hud, body:not(.playing) .dock{display:none}
   <nav class="bar" id="bar" aria-label="Your arsenal"></nav>
 </div>
 
+<header class="btop" id="build-top">
+  <div class="where"><b id="build-name">My battle</b><span id="build-info"></span></div>
+  <span class="grow"></span>
+  <button class="pxbtn" id="bt-setup" type="button">Setup</button>
+  <button class="pxbtn" id="bt-undo" type="button">Undo</button>
+  <button class="pxbtn" id="bt-surprise" type="button">Surprise me</button>
+  <button class="pxbtn" id="bt-clear" type="button">Clear</button>
+  <button class="pxbtn" id="btn-look-build" type="button" hidden>See fort</button>
+  <button class="pxbtn go" id="bt-test" type="button">Test it!</button>
+  <button class="pxbtn" id="bt-done" type="button">Done</button>
+</header>
+
+<div class="bdock" id="build-dock">
+  <p class="hint" id="build-hint" aria-live="polite"></p>
+  <nav class="bar" id="build-bar" aria-label="Pieces to build with"></nav>
+</div>
+
 <section class="overlay" id="menu" aria-labelledby="menu-title">
   <div class="panel">
     <p class="eyebrow">Pick a war, then a battle</p>
     <h1 class="logo" id="menu-title" aria-label="Angry Dudes"><span class="a">ANGRY</span><span class="d">DUDES</span></h1>
     <div class="packs" id="packs" role="group" aria-label="Battle packs"></div>
     <p class="lede" id="pack-blurb"></p>
+    <div class="modes" id="modes"></div>
     <div id="camp-banner-slot"></div>
     <div class="levels" id="levels"></div>
     <p class="howto"><b>How to play:</b> pick something from your arsenal at the bottom of the screen. Drag back and let go to launch troops and weapons. Tap once to send a vehicle. For planes, tap the spot you want bombed. Tap again while it's moving for its special move.</p>
@@ -254,6 +319,7 @@ body:not(.playing) .hud, body:not(.playing) .dock{display:none}
     <p class="eyebrow" id="camp-eyebrow">Campaign</p>
     <h2 id="camp-title">Road to the Rhine</h2>
     <p class="lede" id="camp-blurb"></p>
+    <div class="chapters" id="camp-chapters" role="group" aria-label="Campaign parts" hidden></div>
     <div class="camp-grid">
       <div class="map-wrap">
         <canvas id="camp-map" width="384" height="216" role="img" aria-label="Campaign map"></canvas>
@@ -278,6 +344,66 @@ body:not(.playing) .hud, body:not(.playing) .dock{display:none}
     <div class="actions">
       <button class="big alt" id="btn-camp-back" type="button">Menu</button>
       <button class="big alt" id="btn-camp-reset" type="button">Start over</button>
+    </div>
+  </div>
+</section>
+
+<section class="overlay" id="builder" hidden aria-labelledby="builder-title">
+  <div class="panel">
+    <p class="eyebrow" id="builder-eyebrow">Level Builder</p>
+    <h2 class="camp-like" id="builder-title">Build your own battle</h2>
+    <p class="lede">Stack up a fort, put in the defenders, choose what you get to fire at it, then play it! Your levels are saved on this device, and you can send one to a friend as a code.</p>
+    <div class="actions">
+      <button class="big" id="btn-build-new" type="button">New level</button>
+      <button class="big alt" id="btn-build-import" type="button">Paste a code</button>
+    </div>
+    <div class="import" id="build-import" hidden>
+      <textarea id="import-code" rows="3" placeholder="Paste a level code here" aria-label="Level code"></textarea>
+      <div class="actions"><button class="big" id="btn-import-go" type="button">Add this level</button></div>
+    </div>
+    <p class="note small" id="builder-msg" aria-live="polite"></p>
+    <div class="share" id="build-share" hidden>
+      <p class="lbl" id="share-title">Share this level</p>
+      <textarea id="share-code" rows="4" readonly aria-labelledby="share-title"></textarea>
+      <p class="note small">Send the code (or the link) to a friend. They press <b>Paste a code</b> in their Level Builder.</p>
+      <div class="actions"><button class="big" id="btn-share-copy" type="button">Copy code</button><button class="big alt" id="btn-share-link" type="button">Copy link</button></div>
+    </div>
+    <p class="lbl">My levels</p>
+    <div class="levels" id="my-levels"></div>
+    <div class="actions" style="margin-top:16px"><button class="big alt" id="btn-build-back" type="button">Menu</button></div>
+  </div>
+</section>
+
+<section class="overlay" id="build-setup" hidden aria-labelledby="setup-title">
+  <div class="panel wide">
+    <p class="eyebrow">Level Builder</p>
+    <h2 class="camp-like" id="setup-title">Battle setup</h2>
+    <label class="field"><span>Name</span><input id="setup-name" maxlength="28" autocomplete="off" spellcheck="false"></label>
+    <p class="lbl">Battlefield size</p><div class="seg" id="setup-size" role="group" aria-label="Battlefield size"></div>
+    <p class="lbl">Scenery</p><div class="seg" id="setup-scene" role="group" aria-label="Scenery"></div>
+    <p class="lbl">Wind</p><div class="seg" id="setup-wind" role="group" aria-label="Wind"></div>
+    <p class="lbl">Your arsenal <small id="setup-sugg"></small></p>
+    <div class="arsenal-edit" id="setup-arsenal"></div>
+    <div class="actions">
+      <button class="big" id="btn-setup-done" type="button">Done</button>
+      <button class="big alt" id="btn-setup-auto" type="button">Pick an arsenal for me</button>
+    </div>
+  </div>
+</section>
+
+<section class="overlay" id="fortress" hidden aria-labelledby="fort-title">
+  <div class="panel">
+    <p class="eyebrow" id="fort-eyebrow">Fortress Battle</p>
+    <h2 class="camp-like" id="fort-title">Fortress Battle</h2>
+    <p class="lede">Build your own fortress and guard it with your soldiers. Then take turns with the enemy: you fire at their fort, they fire back at yours. Knock out all of theirs before they get all of yours!</p>
+    <p class="lbl">How tough is the enemy?</p>
+    <div class="seg" id="fort-diff" role="group" aria-label="Enemy difficulty"></div>
+    <p class="note small" id="fort-note" style="margin-top:10px"></p>
+    <div class="actions" style="margin-top:16px">
+      <button class="big" id="btn-fort-build" type="button">Build my fortress</button>
+      <button class="big alt" id="btn-fort-mine" type="button">Fight with my fortress</button>
+      <button class="big alt" id="btn-fort-quick" type="button">Quick battle</button>
+      <button class="big alt" id="btn-fort-back" type="button">Menu</button>
     </div>
   </div>
 </section>
