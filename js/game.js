@@ -1620,14 +1620,17 @@
   function campNext(C, cs) { for (var i = 0; i < C.missions.length; i++) if (cs.done.indexOf(C.missions[i].level) < 0) return i; return C.missions.length; }
   function campRank(C, cs) { return C.ranks[Math.min(C.ranks.length - 1, cs.done.length)]; }
   function levelNumber(P, id) { for (var i = 0; i < P.levels.length; i++) if (P.levels[i].id === id) return i; return -1; }
+  // Rewards add at most `maxExtra` items to a battle (4 unless the campaign says otherwise), in the order they were
+  // picked, so a long campaign's late battles don't drown in extra troops; upgrades (buffs) always apply.
   function campaignArsenal(L) {
-    var a = {}, P = campaign.P;
+    var a = {}, P = campaign.P, room = campaign.C.maxExtra != null ? campaign.C.maxExtra : 4;
     Object.keys(L.arsenal).forEach(function (k) { a[k] = L.arsenal[k]; });
     campaign.s.perks.forEach(function (id) {
       var r = campReward(campaign.C, id);
       if (r && r.add) Object.keys(r.add).forEach(function (k) {
         if (L.airOnly && P.units[k].kind !== "air") return;      // ground troops sit out Air Force missions
-        a[k] = (a[k] || 0) + r.add[k];
+        var n = Math.min(r.add[k], room);
+        if (n > 0) { a[k] = (a[k] || 0) + n; room -= n; }
       });
     });
     return a;
@@ -1699,7 +1702,7 @@
     var v = ch && ch.view, k = v ? 384 / v[2] : 1, x0 = v ? v[0] : 0, y0 = v ? v[1] : 0;
     return { k: k, pt: function (p) { return [(p[0] - x0) * k, (p[1] - y0) * k]; } };
   }
-  function drawCampaignMap(C, cs, ch) {
+  function drawCampaignMap(C, cs, ch, last) {
     var cv = $("camp-map"), c = cv.getContext("2d"), W = cv.width, H = cv.height, M = C.map, V = mapView(ch);
     var img = c.createImageData(W, H), d = img.data, mask = new Uint8Array(W * H), r = rng(77), x, y, i;
     // land from outlines (even-odd scanline fill), sea everywhere else
@@ -1753,7 +1756,7 @@
     cities.forEach(function (ct) { var q = V.pt([ct.x, ct.y]); c.fillStyle = "#1d1a2b"; c.fillRect(Math.round(q[0]) - 2, Math.round(q[1]) - 2, 5, 5); c.fillStyle = "#ffffff"; c.fillRect(Math.round(q[0]) - 1, Math.round(q[1]) - 1, 3, 3); });
     // the route: solid gold where you've already fought, dashed white ahead
     C.missions.forEach(function (m, k) {
-      if (!k) return;
+      if (!k || k > last) return;      // the route so far: up to the end of the chapter on show
       var prev = C.missions[k - 1], pts = [[prev.x, prev.y]].concat(m.via || [], [[m.x, m.y]]).map(V.pt), won = cs.done.indexOf(m.level) >= 0;
       for (var j = 0; j + 1 < pts.length; j++) {
         if (won) routePixels(c, [pts[j][0] - 1, pts[j][1] - 1], [pts[j + 1][0] - 1, pts[j + 1][1] - 1], "#1d1a2b", false);
@@ -1777,7 +1780,7 @@
     var P = pack, C = P.campaign, cs = campState(P), next = campNext(C, cs), W = 384, H = 216;
     var chs = campChapters(C), cn = chapterOf(C, campSel), ch = chs[cn], V = mapView(ch);
     setText("camp-eyebrow", P.name + " campaign"); setText("camp-title", C.name); setText("camp-blurb", C.blurb);
-    drawCampaignMap(C, cs, ch);
+    drawCampaignMap(C, cs, ch, chapterEnd(C, cn));
     // chapter tabs: a chapter opens once its first mission is unlocked
     var tabs = $("camp-chapters"); tabs.innerHTML = ""; tabs.hidden = chs.length < 2;
     chs.forEach(function (h, n) {

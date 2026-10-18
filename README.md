@@ -49,8 +49,8 @@ screen count the defenders you can't see.
 | Pirates vs. Navy, 1668–1718 | Pirates | Spanish and Royal Navy | Portobelo, Lake Maracaibo, Ocracoke Inlet | enemy ships float on the water (knock the crew overboard!), longboats, Morgan's fire ship, grenadoes, broadsides, Blackbeard |
 | American Revolution, 1777–1781 | Continental Army | British Army | Breymann Redoubt, Stony Point, Redoubt No. 10, Siege of Yorktown | axemen chop the abatis, grapeshot, bayonet charges at night, powder wagon, siege battery |
 | Napoleon's Wars, 1809–1815 | French army | Austrian and Allied armies | Ratisbon, La Haye Sainte, Hougoumont | Old Guard ground-pound, sappers chop gates, cuirassier charge, the grand battery |
-| World War I, 1918 | U.S. Army | German Army | Cantigny, Belleau Wood, Saint-Mihiel, Meuse-Argonne | trenches, barbed wire, Renault tanks that cross trenches, Sergeant York, tunnel mines, observation balloons |
-| World War II, 1944–1945 | U.S. Army | German Army | Omaha Beach, Pointe du Hoc, Brécourt Manor, Fort du Roule, Operation Crossbow (an all-aircraft Air Force mission), Bastogne, Remagen Bridge | the **Road to the Rhine campaign**, paratroopers and C-47 drops, halftracks, Sherman vs. Tiger, fighter-bombers that fly under the flak, strafing runs, naval guns, a bridge over the Rhine |
+| World War I, 1918 | U.S. Army | German Army | Cantigny, Belleau Wood, Soissons, Fismette, Saint-Mihiel, Balloon Busters (an all-aircraft mission), Montfaucon, Blanc Mont Ridge, The Lost Battalion, Meuse-Argonne, Crossing the Meuse | the **Over There campaign**, trenches, barbed wire, Renault tanks that cross trenches, Schneider tanks that ram, pontoon boats, Sergeant York, tunnel mines, observation balloons, strafing SPADs that fly under the "Archie" anti-aircraft guns |
+| World War II, 1944–1945 | U.S. Army | German Army | Sainte-Mère-Église, Utah Beach, Omaha Beach, Pointe du Hoc, Brécourt Manor, La Fière Causeway, Carentan, Fort du Roule, Saint-Lô, Operation Cobra, Operation Crossbow (an all-aircraft Air Force mission), Liberation of Paris, Siegfried Line, Aachen, Hürtgen Forest, Bastogne, Remagen Bridge, Operation Varsity | the **Road to the Rhine campaign**, paratroopers, C-47 drops and gliders, halftracks, Sherman vs. Tiger, Rhino tanks with hedgerow cutters, bayonet charges, dragon's teeth, Panzerfaust soldiers, fighter-bombers that fly under the flak, strafing runs, naval guns, a bridge over the Rhine |
 | Space Battle, the future | Star Marines | the Robot Legion | Moon Base Alpha, Mega-Bot's Asteroid | low gravity, jetpack troopers, lasers that fly dead straight, a moon rover, dropships, an orbital strike (this one is made up!) |
 
 Defenders are drawn as soldiers of their time. No Nazi symbols appear anywhere: German vehicles carry
@@ -87,19 +87,36 @@ The enemy aims for real. On **Easy** it's a bad shot with a small fort; on **Nor
 fight back; on **Hard** it hardly ever misses, its defenders are 25% tougher and it uses its biggest guns.
 **New enemy fort** after a battle builds a different fort to fight. Your fortress is saved for each war.
 
-## The World War II campaign
+## The campaigns
 
-The World War II tab has a **Campaign: Road to the Rhine** button. It opens a map of Normandy, Belgium and
-the Rhine with the seven battles in order. Missions unlock one at a time. Each first win lets you pick one
-of three rewards (an extra Bazooka in every battle, veteran riflemen who hit harder, a Sherman platoon, air
-support…), and your army keeps it for the rest of the campaign. You're promoted from Private to General
-along the way. In return, each mission's defenders are tougher than the last (up to 55% more health at
-Remagen). Ground reinforcements stay home on the Air Force mission. Campaign progress is saved in the
-browser; **Start over** on the map wipes it.
+**Road to the Rhine (World War II).** The World War II tab has a **Campaign: Road to the Rhine** button. Its
+18 missions run from the paratroopers landing at Sainte-Mère-Église on the night before D-Day, across the
+beaches, through the hedgerows of Normandy, to Paris, into Germany and over the Rhine with Operation
+Varsity. The map comes in four parts (D-Day, Normandy, Liberation, Into Germany): the first two zoom in close
+on the Normandy coast, and the map zooms out as you push east. Missions unlock one at a time. Each first win
+lets you pick one of three rewards (a bazooka team, veteran GIs who hit harder, bigger engineer charges, air
+support, thicker armor…), and your army keeps it for the rest of the campaign. Most of the 22 rewards are
+upgrades rather than extra items. You're promoted from Private all the way to General of the Army. In return,
+each mission's defenders are tougher than the last (up to 60% more health at Varsity).
 
-A pack gets a campaign by adding a `campaign` block (see the bottom of `js/packs/ww2.js`): the missions in
-order with their spots on the map, the rewards, the `toughness` for each mission, and the map itself as a
-few coastline outlines, rivers, forests and labels on a 384 × 216 grid.
+**Over There (World War I).** The World War I tab has a **Campaign: Over There** button, named after the 1917
+song. It opens a map of north-east France with the Western Front as it stood in the summer of 1918, and
+eleven battles of the American Expeditionary Forces, from Cantigny in May to crossing the Meuse in November.
+Rewards include more Doughboys, a Renault tank platoon, Marines who hit harder and a strafing SPAD, and you're
+promoted from Private to General. Balloon Busters is an Air Force mission, so only aircraft and artillery
+rewards join you there. Win the last battle and the guns fall silent at 11 o'clock on November 11, 1918.
+
+Rewards add at most 4 extra items to any one battle; upgrades always apply. Ground reinforcements stay home
+on Air Force missions. Campaign progress is saved in the browser; **Start over** on the map wipes it.
+
+A pack gets a campaign by adding a `campaign` block (see the bottom of `js/packs/ww2.js` or `js/packs/ww1.js`):
+the missions in order with their spots on the map, the rewards (give at least two more than there are
+missions, because each win offers three new ones), `ranks` (one more than there are missions), the
+`toughness` for each mission, a `finale` sentence, and the map itself as coastline outlines, rivers, forests,
+cities, labels and `lines` (like a front line) on a 384 × 216 grid. `chapters` split a long campaign into
+parts: each one names its first mission (`start`) and can zoom into the map with `view: [x, y, width]`
+(and then shows its own `labels` and `cities`). A theme can set `skyline: "village" | "city" | "ruins"` to
+put rooftops, a church or ruined walls on the horizon.
 
 ## Project layout
 
@@ -177,6 +194,9 @@ ANGRY_DEBUG.use("knight", 40, 0.9)     // launch at 40° and 90% power
 ANGRY_DEBUG.tap()                      // trigger the special move
 ANGRY_DEBUG.advance(3000)              // fast-forward 3 seconds
 ANGRY_DEBUG.report()                   // defenders and their health
+ANGRY_DEBUG.mission("ww2", 5)          // play campaign mission 6
+ANGRY_DEBUG.fortress("ww2", 1)         // a quick fortress battle (difficulty 0-2)
+ANGRY_DEBUG.builder("ww2")             // open the Level Builder on a new level
 ```
 
 There's also a play-test bot that plays a level many times with rough, kid-style aim and reports how
@@ -194,5 +214,6 @@ each other rather than as the real difficulty.
 
 - More wars: the Civil War, the Crusades, Alexander the Great
 - Campaigns for the other armies (the map and rewards are just data in the pack file)
-- A campaign map that links the battles in order
+- Two-player fortress battles on one screen, taking turns
+- The Level Builder and Fortress Battle in the iPhone app
 - The iPhone app: SpriteKit can read `assets/sprites.json` and the pack data directly
