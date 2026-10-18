@@ -246,6 +246,80 @@ def shellcrate():
     return g
 
 
+MINI_BRODIE = [             # a doughboy's head and flat helmet, for crews in boats
+    "...kkkk...",
+    "kkkTLTTkkk",
+    ".kkkkkkkk.",
+    ".kskssksk.",
+    ".ksskkssk.",
+    "..kkkkkk..",
+]
+
+
+def schneider():
+    """Schneider CA1, the first French tank: a long armored box with a pointed nose for crushing wire."""
+    g = Grid(46, 24)
+    g.rect(4, 17, 34, 5, "x")                # tracks
+    for cx in (8, 14, 20, 26, 32):
+        g.disc(cx, 19, 1, "G")
+    for y in range(6, 18):                   # hull, with the nose sticking out low in front
+        g.rect(3, y, 34 + (y - 6) // 2, 1, "J")
+    g.rect(3, 6, 34, 1, "2")
+    g.rect(6, 4, 24, 2, "j")                 # roof
+    g.rect(12, 2, 7, 2, "j")                 # commander's cupola
+    g.rect(13, 3, 4, 1, "k")
+    for x0, y0, x1, y1, c in ((5, 8, 11, 14, "j"), (15, 7, 21, 12, "c"), (23, 9, 29, 16, "j"),
+                              (31, 7, 35, 11, "c"), (8, 4, 14, 5, "J"), (22, 4, 28, 5, "c")):
+        g.line(x0, y0, x1, y1, c, 2, only="jJ")
+    g.rect(29, 11, 6, 4, "x")                # 75 mm gun in its side sponson
+    g.rect(35, 12, 8, 2, "X")
+    for x in range(6, 36, 6):
+        g.px(x, 8, "k")                      # rivets
+    g.rect(0, 12, 3, 2, "x")                 # tail stub
+    return g.outline()
+
+
+def pontoon():
+    """A pontoon boat: engineers paddle a squad of doughboys across the river."""
+    g = Grid(48, 20)
+    for x in range(2, 46):
+        depth = 5 if 5 < x < 42 else 3
+        g.rect(x, 12, 1, depth, "G")
+    g.rect(2, 12, 44, 1, "g")
+    g.rect(6, 15, 36, 1, "x")
+    for x in (6, 18, 30):
+        g.stamp(MINI_BRODIE, x, 6)
+    g.line(14, 13, 9, 19, "b")               # paddles
+    g.line(26, 13, 21, 19, "b")
+    g.line(38, 13, 33, 19, "b")
+    g.rect(43, 10, 2, 2, "B")                # rope coil at the bow
+    return g.outline()
+
+
+def archie():
+    """German anti-aircraft gun on a pedestal ("Archie" to Allied pilots)."""
+    g = Grid(34, 24)
+    g.rect(2, 20, 30, 3, "b")                # wooden gun platform
+    g.rect(2, 20, 30, 1, "c")
+    for x in range(6, 32, 7):
+        g.rect(x, 21, 1, 2, "B")
+    g.rect(14, 14, 6, 6, "G")                # pedestal
+    g.rect(14, 14, 6, 1, "g")
+    g.line(14, 14, 22, 7, "x", 3)            # recoil cylinder
+    g.line(17, 11, 30, 1, "G", 2)            # long barrel, pointed at the sky
+    g.rect(30, 0, 3, 2, "x")
+    g.disc(17, 13, 2, "X")                   # trunnion
+    g.rect(21, 15, 4, 1, "x")                # gunlayer's seat
+    g.rect(22, 16, 1, 4, "x")
+    g.stamp(MINI_HEAD, 3, 9)
+    g.rect(4, 16, 6, 4, "T")
+    for x in (24, 28):                       # shells ready in the rack
+        g.rect(x, 16, 2, 4, "V")
+        g.px(x, 15, "y")
+        g.px(x + 1, 15, "y")
+    return g.outline().mirror()
+
+
 def build():
     add("doughboy", doughboy(), "doughboys")
     add("marine", marine(), "doughboys")
@@ -263,3 +337,6 @@ def build():
     add("kaiser_officer", kaiser_officer(), "kaiser")
     add("tin", tin())
     add("shellcrate", shellcrate())
+    add("schneider", schneider())
+    add("pontoon", pontoon(), "doughboys")
+    add("archie", archie(), "kaiser")

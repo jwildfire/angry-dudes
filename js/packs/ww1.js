@@ -7,7 +7,7 @@
   side: "U.S. Army",
   foe: "German Army",
   icon: "doughboy",
-  blurb: "Go over the top with Doughboys and Marines, roll Renault tanks across the trenches and bomb the observation balloons.",
+  blurb: "Go over the top with Doughboys and Marines, roll Renault tanks across the trenches, paddle across the Meuse and bust the observation balloons.",
   props: { bunker: "sandbag", pennant: ["#2b4a8c", "#efe9d8"] },
 
   units: {
@@ -29,16 +29,26 @@
                 speed: 0.8, push: 0.3, hp: 9, tap: "shoot", shots: 4, gun: { x: 16, y: -12, vx: 13, vy: -0.4 },
                 shell: { sprite: "proj_tankshell", w: 6, h: 3, density: 0.004, lift: 0.9, impact: true, boom: { r: 22, p: 3.2 }, best: "sandbag" },
                 hint: "Tap to roll out. It's long enough to cross trenches. Tap again to fire (4 shots)." },
+    schneider: { name: "Schneider tank", kind: "drive", sprite: "schneider", w: 40, h: 16, density: 0.006, best: "brick",
+                speed: 0.75, push: 0.3, hp: 10, tap: "ram", ramSpeed: 2.4, shout: "EN AVANT!",
+                hint: "A big French tank. Tap to roll out, then tap again to ram whatever is in front of it." },
+    pontoon:  { name: "Pontoon boat", kind: "drive", sprite: "pontoon", w: 44, h: 10, density: 0.004, best: "landser", boat: true,
+                speed: 1, push: 0.4, hp: 6, tap: "unload", unload: { unit: "doughboy", count: 3, vx: 2.6, vy: -8.5, spread: 1 },
+                shout: "ACROSS!", hint: "Tap to paddle it across the river, then tap again and three Doughboys jump ashore." },
     spad:     { name: "SPAD biplane", kind: "air", style: "plane", sprite: "spad", bombs: 2, spacing: 14, speed: 2.4, alt: 36,
                 bomb: { sprite: "proj_bomb", w: 10, h: 4, impact: true, boom: { r: 28, p: 3.2 } },
                 hint: "Tap where the biplane should drop its two bombs. Great for balloons." },
+    spads:    { name: "Strafing SPAD", kind: "air", style: "plane", sprite: "spad", lowLevel: true, bombs: 8, spacing: 9, speed: 2.6, alt: 120,
+                dropVx: 0, dropVy: 10, say: "STRAFING RUN!",
+                bomb: { sprite: "proj_rifleball", w: 4, h: 2, density: 0.006, soft: true, power: 0.8, life: 1200 },
+                hint: "A SPAD fighter dives with its machine guns blazing. It flies too low for the Archie guns, and it's the best way to pop a balloon." },
     mine:     { name: "Tunnel mine", kind: "air", style: "mine", icon: "tunneler", boom: { r: 50, p: 5.5 }, say: "DIGGING…", blast: "KA-BOOM!",
                 hint: "Tap a spot. Tunnelers dig under it and blow it up from below." },
     barrage:  { name: "Artillery barrage", kind: "air", style: "rain", icon: "french75", count: 6, gap: 16, every: 200, vx: 2.5, vy: 0, say: "FIRE!", sound: "thump",
                 proj: { sprite: "proj_shell", w: 8, h: 4, density: 0.004, impact: true, boom: { r: 26, p: 3 } },
                 hint: "Tap the target. The big guns drop six shells across it." }
   },
-  order: ["doughboy", "marine", "york", "grenade", "mortar", "french75", "renault", "spad", "mine", "barrage"],
+  order: ["doughboy", "marine", "york", "grenade", "mortar", "french75", "renault", "schneider", "pontoon", "spads", "spad", "mine", "barrage"],
 
   blocks: {
     S: { key: "sandbag",  name: "Sandbags", hp: 1.5, density: 0.0025, pts: 100, debris: ["#d9bc80", "#a9884f"] },
@@ -46,11 +56,15 @@
     L: { key: "log",      name: "Dugout timber", hp: 2.6, density: 0.0018, pts: 200, debris: ["#a8693a", "#d9bc80"] },
     C: { key: "concrete", name: "Concrete", hp: 5, density: 0.004, pts: 500, debris: ["#9a9ea3", "#74787e"] },
     R: { key: "rock",     name: "Boulder", hp: 6, density: 0.006, pts: 300, debris: ["#9a9ea3", "#c4c7cb"] },
+    Q: { key: "brick",    name: "Brick wall", hp: 4.5, density: 0.004, pts: 400, debris: ["#b9533a", "#d9c4aa"] },
+    N: { key: "stone",    name: "Church wall", hp: 6, density: 0.0045, pts: 500, debris: ["#a39b8b", "#cbc4b4"] },
+    H: { key: "thatch",   name: "Wheat sheaves", hp: 1, density: 0.0008, pts: 100, debris: ["#d9b44a", "#9c7a2c"] },
     X: { key: "wire",     name: "Barbed wire", hp: 1, density: 0.001, pts: 100, debris: ["#646d7b", "#a8693a"], w: 16, h: 10, fixed: true, sensor: true },
     K: { key: "shellcrate", name: "Shell crate", hp: 0.5, density: 0.002, pts: 300, debris: ["#a8693a", "#c98d3c"], explodes: { r: 36, p: 4 }, fire: true },
     "=": { key: "concrete", sprite: "concrete", slab: true, hp: 6, density: 0.004, pts: 800, debris: ["#9a9ea3", "#74787e"] },
     "~": { key: "wood", sprite: "wood", slab: true, hp: 2.5, density: 0.0015, pts: 300, debris: ["#a8693a", "#5e3a1d"] },
-    "_": { key: "tin", sprite: "tin", slab: true, hp: 3, density: 0.003, pts: 300, debris: ["#a9b2bf", "#646d7b"] }
+    "_": { key: "tin", sprite: "tin", slab: true, hp: 3, density: 0.003, pts: 300, debris: ["#a9b2bf", "#646d7b"] },
+    "^": { key: "tiles", sprite: "tiles", slab: true, hp: 3, density: 0.003, pts: 400, debris: ["#b9533a", "#7d3424"] }
   },
   defenders: {
     g: { key: "landser", name: "German soldier", w: 12, h: 17, hp: 1.6, density: 0.002, pts: 500 },
@@ -60,6 +74,8 @@
     w: { key: "minenwerfer", name: "Trench mortar", w: 20, h: 12, hp: 3, density: 0.005, pts: 2000, cells: 2,
          react: { type: "antitank", every: 2200, range: 320, muzzle: { x: -10, y: -8 }, vx: -8.5, vy: -7,
                   shell: { sprite: "proj_mortarshell", w: 8, h: 8, round: true, density: 0.006, enemy: true, impact: true, boom: { r: 20, p: 3 } } } },
+    a: { key: "archie", name: "Anti-aircraft gun", w: 30, h: 16, hp: 3, density: 0.005, pts: 2500, cells: 2,
+         react: { type: "flak", say: "SHOT DOWN BY ARCHIE!", muzzle: { x: -10, y: -16 } } },
     o: { key: "officer", sprite: "kaiser_officer", name: "German officer", w: 12, h: 19, hp: 3.5, density: 0.0025, pts: 5000 }
   },
 
@@ -70,13 +86,104 @@
     forest:   { sky: ["#86a9c9", "#a9c3d6", "#cfdbe3"], sun: "#fff0b3", clouds: true, hills: ["#4f7a45", "#3e6638"], trees: "oak", treeColor: "#2f5a2a", split: 9999,
                 left:  { top: "#4f8a3a", hi: "#6fa852", base: "#5a4630", lo: "#43341f" },
                 right: { top: "#4f8a3a", hi: "#6fa852", base: "#5a4630", lo: "#43341f" } },
+    wheat:    { sky: ["#6fb0e6", "#98c8ee", "#cfe3f2"], sun: "#ffe25a", clouds: true, hills: ["#d9b44a", "#b8943a"], trees: "oak", treeColor: "#4f7a3a", split: 9999,
+                left:  { top: "#d9b44a", hi: "#f0d478", base: "#7a5634", lo: "#5a3c22" },
+                right: { top: "#d9b44a", hi: "#f0d478", base: "#7a5634", lo: "#5a3c22" } },
+    vesle:    { sky: ["#7fb0d9", "#a3c6e3", "#cfdfe8"], sun: "#fff0b3", clouds: true, hills: ["#7fa25a", "#638a48"], trees: "oak", treeColor: "#3e6638",
+                water: "#4a7896", waterHi: "#a9cbe0", split: 9999, skyline: "village",
+                left:  { top: "#5f8a3a", hi: "#7fa852", base: "#6a4a2c", lo: "#4f3620" },
+                right: { top: "#5f8a3a", hi: "#7fa852", base: "#6a4a2c", lo: "#4f3620" },
+                rock: ["#8a7f6a", "#6f6553", "#a49a84"] },
     drizzle:  { sky: ["#6f777f", "#868d92", "#a2a59e"], clouds: true, cloud: "#b2b4ad", hills: ["#6a6a4e", "#56563f"], trees: "stump", weather: "rain", split: 9999,
                 left:  { top: "#6f6043", hi: "#8a7a58", base: "#5a4630", lo: "#43341f" },
                 right: { top: "#6f6043", hi: "#8a7a58", base: "#5a4630", lo: "#43341f" } },
+    dusk:     { sky: ["#2f3a6a", "#8a5a7a", "#e8956a"], sun: "#ffcf6a", clouds: true, cloud: "#d9a08a", hills: ["#4a4a5a", "#3a3a48"], trees: "stump", split: 9999,
+                left:  { top: "#5d5a3c", hi: "#77724e", base: "#4a3a28", lo: "#34281a" },
+                right: { top: "#5d5a3c", hi: "#77724e", base: "#4a3a28", lo: "#34281a" } },
+    hilltop:  { sky: ["#8f979c", "#aab0b2", "#c9cbc6"], clouds: true, cloud: "#dcdcd6", hills: ["#7f8466", "#686d52"], trees: "stump", split: 9999, skyline: "village",
+                left:  { top: "#6f6043", hi: "#8a7a58", base: "#5a4630", lo: "#43341f" },
+                right: { top: "#6f6043", hi: "#8a7a58", base: "#5a4630", lo: "#43341f" },
+                rock: ["#8a7f6a", "#6f6553", "#a49a84"] },
+    chalk:    { sky: ["#8fa3b8", "#adbccb", "#d3dbe1"], clouds: true, cloud: "#e6eaec", hills: ["#b8b49a", "#9e9a80"], trees: "pine", treeColor: "#3e4a3a", split: 9999,
+                skyline: "ruins",
+                left:  { top: "#b3ad8f", hi: "#d6d1b8", base: "#bdb6a0", lo: "#a39c86" },
+                right: { top: "#b3ad8f", hi: "#d6d1b8", base: "#bdb6a0", lo: "#a39c86" },
+                rock: ["#d9d4c4", "#b8b2a0", "#efebdf"] },
+    ravine:   { sky: ["#5f6a70", "#7a8488", "#9aa19f"], clouds: true, cloud: "#a9aeab", hills: ["#3e5238", "#30422c"], trees: "oak", treeColor: "#2a4026", split: 9999,
+                left:  { top: "#4f5a34", hi: "#66724a", base: "#4a3a28", lo: "#34281a" },
+                right: { top: "#4f5a34", hi: "#66724a", base: "#4a3a28", lo: "#34281a" } },
     argonne:  { sky: ["#7f8f99", "#9eabb2", "#c0c6c4"], clouds: true, cloud: "#d4d6d0", hills: ["#53704a", "#3f5a3a"], trees: "oak", treeColor: "#35502f", split: 9999,
                 left:  { top: "#5d6b3c", hi: "#7a8a52", base: "#5a4630", lo: "#43341f" },
                 right: { top: "#5d6b3c", hi: "#7a8a52", base: "#5a4630", lo: "#43341f" },
-                rock: ["#6f6a5a", "#565246", "#8a8470"] }
+                rock: ["#6f6a5a", "#565246", "#8a8470"] },
+    predawn:  { sky: ["#141c3a", "#2a3360", "#6a5a7a"], night: true, hills: ["#2a3040", "#202636"], trees: "stump", split: 9999, skyline: "village",
+                water: "#2f4a6a", waterHi: "#8a9fc0",
+                left:  { top: "#4a5638", hi: "#606c48", base: "#3a2e22", lo: "#2a2018" },
+                right: { top: "#4a5638", hi: "#606c48", base: "#3a2e22", lo: "#2a2018" },
+                rock: ["#5a5a62", "#46464e", "#707078"] }
+  },
+
+  // The campaign "Over There" (named after the 1917 song): the battles in order on a map of north-east France.
+  // Each first win offers three rewards; the one you pick stays with your army for the rest of the campaign.
+  // `toughness` multiplies the defenders' health in each mission, so later battles get harder.
+  campaign: {
+    name: "Over There",
+    blurb: "Lead the American Expeditionary Forces through 1918, from the first American attack at Cantigny all the way to the Meuse River. Every victory earns a reward for your army, and every battle is tougher than the last.",
+    finale: "At 11 o'clock on November 11, 1918, the guns fell silent all along the Western Front: the war was over, and the Doughboys were going home.",
+    ranks: ["Private", "Private First Class", "Corporal", "Sergeant", "Second Lieutenant", "First Lieutenant", "Captain", "Major",
+            "Colonel", "Brigadier General", "Major General", "General"],
+    toughness: [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.36, 1.42, 1.48, 1.55],
+    missions: [
+      { level: "cantigny",  x: 43,  y: 56 },
+      { level: "belleau",   x: 113, y: 140, via: [[70, 90], [92, 128]] },
+      { level: "soissons",  x: 106, y: 106 },
+      { level: "fismette",  x: 147, y: 107 },
+      { level: "stmihiel",  x: 309, y: 167, via: [[176, 140], [240, 154], [286, 176]] },
+      { level: "balloons",  x: 286, y: 150 },
+      { level: "montfaucon", x: 272, y: 112 },
+      { level: "blancmont", x: 216, y: 115 },
+      { level: "lostbattalion", x: 242, y: 102 },
+      { level: "argonne",   x: 256, y: 124 },
+      { level: "meuse",     x: 284, y: 94 }
+    ],
+    rewards: [
+      { id: "doughboys", name: "Fresh troops",     text: "+2 Doughboys in every battle", icon: "doughboy", add: { doughboy: 2 } },
+      { id: "grenades",  name: "Grenade sacks",    text: "+1 Grenade in every battle", icon: "bomber", add: { grenade: 1 } },
+      { id: "marine",    name: "Marine platoon",   text: "+1 Marine in every battle", icon: "marine", add: { marine: 1 } },
+      { id: "renault",   name: "Tank platoon",     text: "+1 Renault tank in every battle", icon: "renault", add: { renault: 1 } },
+      { id: "hatring",   name: "Hat in the Ring",  text: "+1 Strafing SPAD in every battle", icon: "spad", add: { spads: 1 } },
+      { id: "barrage",   name: "Big guns",         text: "+1 Artillery barrage in every battle", icon: "french75", add: { barrage: 1 } },
+      { id: "veterans",  name: "Veteran Doughboys", text: "Doughboys and Sgt. York hit 40% harder", icon: "doughboy", buff: { doughboy: { power: 1.4 }, york: { power: 1.4 } } },
+      { id: "devildogs", name: "Devil Dogs",       text: "Marines hit 40% harder", icon: "marine", buff: { marine: { power: 1.4 } } },
+      { id: "bombs",     name: "Better grenades",  text: "Grenades blast 35% bigger", icon: "bomber", buff: { grenade: { boom: 1.35 } } },
+      { id: "shells",    name: "Heavier shells",   text: "Trench mortar shells blast 35% bigger", icon: "mortar", buff: { mortar: { boom: 1.35 } } },
+      { id: "french75",  name: "High explosive",   text: "French 75 shells blast 35% bigger", icon: "french75", buff: { french75: { boom: 1.35 } } },
+      { id: "armor",     name: "Thicker armor",    text: "Your tanks and boats are 50% tougher", icon: "schneider",
+        buff: { renault: { hp: 1.5 }, schneider: { hp: 1.5 }, pontoon: { hp: 1.5 } } },
+      { id: "tunnelers", name: "Expert tunnelers", text: "Tunnel mines blast 40% bigger", icon: "tunneler", buff: { mine: { boom: 1.4 } } }
+    ],
+    // the map is 384 x 216 pixels covering north-east France (about 2.0°E to 6.4°E, 48.55°N to 50.05°N)
+    map: {
+      land: [{ tint: "europe", pts: [[0, 0], [384, 0], [384, 216], [0, 216]] }],
+      rivers: [
+        { w: 2, pts: [[324, 216], [316, 190], [311, 170], [305, 150], [296, 130], [290, 115], [282, 100], [278, 90], [272, 74], [262, 56], [257, 50], [245, 44], [238, 36], [240, 18], [236, 0]] },
+        { w: 2, pts: [[257, 203], [225, 192], [206, 157], [186, 150], [170, 145], [143, 141], [122, 144], [100, 150], [77, 157], [56, 168], [36, 177], [20, 180], [0, 184]] },
+        { w: 2, pts: [[253, 138], [246, 116], [236, 94], [222, 84], [207, 78], [186, 88], [166, 94], [140, 95], [115, 96], [92, 94], [72, 91]] },
+        { w: 1, pts: [[96, 34], [87, 68], [72, 91], [56, 104], [41, 114], [24, 134], [9, 151], [0, 156]] },
+        { w: 1, pts: [[224, 152], [200, 128], [177, 116], [160, 110], [147, 107], [140, 95]] },
+        { w: 2, pts: [[339, 216], [339, 197], [350, 180], [355, 166], [362, 150], [365, 134], [364, 99], [376, 72], [384, 60]] }
+      ],
+      forests: [{ x: 251, y: 118, rx: 7, ry: 22 }, { x: 113, y: 138, rx: 5, ry: 4 }, { x: 94, y: 118, rx: 8, ry: 8 }],
+      // the Western Front in the summer of 1918: the bulge down to the Marne at Château-Thierry, and the Saint-Mihiel salient
+      lines: [{ color: "#b8432f", dashed: true, pts: [[58, 0], [50, 20], [42, 40], [48, 58], [66, 66], [87, 68], [96, 82], [100, 96], [100, 114],
+                                                    [110, 134], [122, 144], [138, 140], [152, 142], [162, 130], [168, 118], [176, 106], [188, 112],
+                                                    [200, 120], [220, 122], [240, 121], [258, 122], [278, 120], [292, 113], [304, 116], [312, 128],
+                                                    [316, 142], [308, 166], [320, 172], [340, 170], [355, 166], [384, 172]] }],
+      cities: [{ name: "Paris", x: 30, y: 171 }, { name: "Amiens", x: 26, y: 23 }, { name: "Reims", x: 177, y: 114 }, { name: "Verdun", x: 295, y: 128 },
+               { name: "Metz", x: 365, y: 134 }, { name: "Sedan", x: 257, y: 50 }],
+      labels: [{ text: "France", x: 150, y: 190 }, { text: "Western Front", x: 196, y: 134 }, { text: "Belgium", x: 196, y: 12 },
+               { text: "Germany", x: 350, y: 100 }]
+    }
   },
 
   levels: [
@@ -99,7 +206,7 @@
     },
     {
       id: "belleau", name: "Belleau Wood", date: "June 1918", theme: "forest", width: 900,
-      history: "Belleau Wood was a thick forest full of boulders where German machine gunners hid. U.S. Marines crossed an open wheat field and fought tree by tree for three weeks, until a report announced the woods were \u201cU.S. Marine Corps entirely.\u201d",
+      history: "Belleau Wood was a thick forest full of boulders where German machine gunners hid. U.S. Marines crossed an open wheat field and fought tree by tree for three weeks, until a report announced the woods were “U.S. Marine Corps entirely.”",
       tip: "Marines are your machine-gun busters: launch one, then tap to charge. The gunners can't hit troops that fly high.",
       fortX: 440,
       trenches: [{ x: 696, w: 32, d: 20 }],
@@ -113,6 +220,41 @@
       extras: [{ type: "wire", x: 392 }, { type: "wire", x: 416 }],
       arsenal: { marine: 4, doughboy: 2, grenade: 4, mortar: 2, french75: 1, barrage: 1 },
       wind: 2, stars: [20000, 30000]
+    },
+    {
+      id: "soissons", name: "Soissons", date: "July 18, 1918", theme: "wheat", width: 960,
+      history: "At dawn on July 18, 1918, the U.S. 1st and 2nd Divisions attacked near Soissons side by side with French soldiers and French tanks. There was no long bombardment first, so the surprised Germans saw the troops charging at them through tall fields of wheat. It was the turning point of the war: from then on, the Germans were pushed back.",
+      tip: "The French Schneider tank can ram: tap to roll out, then tap again to smash into the farmhouse. Take out the trench mortar first, because it fires at tanks.",
+      fortX: 470,
+      trenches: [{ x: 470, w: 32, d: 20 }],
+      craters: [{ x: 300, r: 9 }, { x: 640, r: 8 }],
+      fort: [
+        "................g.......",
+        "..............^^^^^.....",
+        "..H......~~~..Q...Q.....",
+        "..HH.....L.L..Q...Q.....",
+        "g.HHSm-..LgL..Q.o.Q.w-.g"
+      ],
+      extras: [{ type: "wire", x: 392 }, { type: "wire", x: 416 }, { type: "wire", x: 440 }],
+      arsenal: { doughboy: 3, marine: 2, grenade: 2, mortar: 2, renault: 1, schneider: 1 },
+      wind: 2
+    },
+    {
+      id: "fismette", name: "Fismette", date: "August 1918", theme: "vesle", width: 1000,
+      history: "In August 1918, the 28th Division, called the “Keystone” Division because its soldiers came from Pennsylvania, pushed the Germans back to the Vesle River. The Doughboys crossed the river to fight for the little village of Fismette on the far bank, while German guns on the hills above fired down at them.",
+      tip: "Troops that fall in the river are lost, so launch them all the way across. The Renault can drive over the bridge if you knock out the trench mortar first.",
+      fortX: 470,
+      trenches: [{ x: 470, w: 96, d: 24, water: true }],
+      cliff: { x: 774, h: 32 },
+      fort: [
+        "......................g...",
+        "...........^^^^^...~~~~~~.",
+        "...........Q...Q...S....S.",
+        "~~~~~~.....Q...Q...S....S.",
+        ".C..C.Sm-g.Q.g.Q.w-Sm-.oS."
+      ],
+      arsenal: { doughboy: 3, marine: 1, grenade: 2, mortar: 2, french75: 1, renault: 1, barrage: 1 },
+      wind: 2
     },
     {
       id: "stmihiel", name: "Saint-Mihiel", date: "September 12, 1918", theme: "drizzle", width: 1000,
@@ -133,8 +275,77 @@
       wind: 3, stars: [26000, 38000]
     },
     {
-      id: "argonne", name: "Meuse-Argonne", date: "October 1918", theme: "argonne", width: 1100,
-      history: "Alvin York, a Tennessee farmer and expert shot, was part of a small patrol sent to stop German machine guns in the Argonne Forest. He marched 132 prisoners back to the American lines and became famous as Sergeant York. Nearby, a wounded carrier pigeon named Cher Ami still delivered its message and won a French medal.",
+      id: "balloons", name: "Balloon Busters", date: "September 1918", theme: "dusk", width: 1000,
+      history: "German observation balloons floated high above the front so their spotters could watch every move. Lieutenant Frank Luke Jr. shot down 14 of them in just a few weeks, which made him famous as the “Arizona Balloon Buster.” Anti-aircraft guns, nicknamed “Archie” by the pilots, guarded the balloons, and Eddie Rickenbacker of the 94th Aero Squadron became America's top flying ace.",
+      tip: "An Air Force mission! Strafing SPADs fly under the Archie guns, so use them to knock out the guns first. Then the bombers can fly safely.",
+      fortX: 480,
+      fort: [
+        "Sa-S..g.W..Sa-S..W....Sa-S"
+      ],
+      extras: [{ type: "balloon", x: 430, alt: 100 }, { type: "balloon", x: 600, alt: 125 }, { type: "balloon", x: 770, alt: 95 },
+               { type: "balloon", x: 940, alt: 115 }],
+      airOnly: true,
+      arsenal: { spads: 7, spad: 2 },
+      wind: 1
+    },
+    {
+      id: "montfaucon", name: "Montfaucon", date: "September 27, 1918", theme: "hilltop", width: 980,
+      history: "Montfaucon was a village on a tall hill, and the Germans had built a concrete lookout post in the ruins of its church. From up there they could see for miles across the battlefield. The 79th Division captured the hill on September 27, the second day of the Meuse-Argonne Offensive.",
+      tip: "The village sits on a steep hill, so aim high. The officer in the lookout post on top of the church is worth a lot of points.",
+      fortX: 450,
+      cliff: { x: 610, h: 48 },
+      trenches: [{ x: 482, w: 32, d: 20 }],
+      craters: [{ x: 310, r: 10 }, { x: 560, r: 8 }],
+      fort: [
+        "..................C.o.C..",
+        "..................=====..",
+        "..................N...N..",
+        ".............^^^^.N...N..",
+        ".............Q..Q.N...N..",
+        "S.g.Sm-Sg.m-SQg.Q.Nw-.N.g"
+      ],
+      extras: [{ type: "wire", x: 370 }, { type: "wire", x: 394 }, { type: "wire", x: 418 }],
+      arsenal: { doughboy: 4, marine: 2, grenade: 3, mortar: 2, french75: 1, spad: 1, barrage: 1 },
+      wind: 2
+    },
+    {
+      id: "blancmont", name: "Blanc Mont Ridge", date: "October 3, 1918", theme: "chalk", width: 1000,
+      history: "The Germans had held Blanc Mont Ridge in the chalky Champagne country for years, and earlier attacks had not been able to take it. On October 3, 1918, the U.S. 2nd Division, Marines and Army soldiers side by side, attacked together with French troops and reached the top of the ridge that same day.",
+      tip: "The bunkers on the ridge are concrete. Crack them with the French 75 and mortar shells, and send Marines after the machine-gun nests.",
+      fortX: 450,
+      cliff: { x: 594, h: 40 },
+      trenches: [{ x: 482, w: 32, d: 20 }],
+      craters: [{ x: 300, r: 11 }, { x: 350, r: 8 }, { x: 560, r: 9 }],
+      fort: [
+        "............g....S.g.S....",
+        "..........=====..=====....",
+        "..........C...C..C...C....",
+        "S.g..m-S..Cm-.C.KCw-oC.g.S"
+      ],
+      extras: [{ type: "wire", x: 380 }, { type: "wire", x: 404 }, { type: "wire", x: 428 }],
+      arsenal: { doughboy: 3, marine: 3, grenade: 2, mortar: 2, french75: 2, spad: 1, barrage: 1 },
+      wind: 2
+    },
+    {
+      id: "lostbattalion", name: "The Lost Battalion", date: "October 1918", theme: "ravine", width: 1060,
+      history: "Major Charles Whittlesey's battalion pushed deep into the Argonne Forest and was surrounded by German troops for days. Their carrier pigeon, Cher Ami, was hurt by gunfire but still flew home with their message, and later won a French medal. Then more American soldiers broke through the German lines to rescue them.",
+      tip: "The Germans strung barbed wire all through the woods. Lob grenades into the trenches and save the barrages for the dugouts.",
+      fortX: 440,
+      trenches: [{ x: 472, w: 32, d: 20 }, { x: 664, w: 32, d: 20 }],
+      craters: [{ x: 280, r: 9 }, { x: 620, r: 8 }],
+      fort: [
+        "..................g..S.g.....",
+        ".........____...~~~~.____....",
+        ".........L..L...R..R.L..L....",
+        "R.g.Sm-S.Lg.L.g.Rm-R.Lo.L.w-."
+      ],
+      extras: [{ type: "wire", x: 340 }, { type: "wire", x: 364 }, { type: "wire", x: 388 }, { type: "wire", x: 412 }],
+      arsenal: { doughboy: 4, marine: 1, grenade: 3, mortar: 2, french75: 1, barrage: 2 },
+      wind: 2
+    },
+    {
+      id: "argonne", name: "Meuse-Argonne", date: "October 8, 1918", theme: "argonne", width: 1100,
+      history: "Alvin York, a Tennessee farmer and expert shot, was part of a small patrol sent to stop German machine guns in the Argonne Forest. He marched 132 prisoners back to the American lines, received the Medal of Honor and became famous as Sergeant York.",
       tip: "Sergeant York can pick off three defenders in one shot. Save the tunnel mine for the bunker on the hill.",
       fortX: 450,
       cliff: { x: 690, h: 32 },
@@ -150,6 +361,23 @@
                { type: "balloon", x: 1050, alt: 100 }],
       arsenal: { doughboy: 3, york: 1, marine: 2, grenade: 2, mortar: 2, renault: 1, spad: 1, mine: 1, barrage: 1 },
       wind: 2, stars: [32000, 46000]
+    },
+    {
+      id: "meuse", name: "Crossing the Meuse", date: "November 1918", theme: "predawn", width: 1080,
+      history: "In early November 1918, soldiers of the 5th Division crossed the Meuse River in the dark. Some swam across the cold water, and engineers built bridges under fire so the rest could follow. About a week later the Armistice was signed, and at 11 o'clock in the morning on November 11, the guns fell silent.",
+      tip: "Paddle the pontoon boat across, then tap to send three Doughboys up the bank. The trench mortar on the heights fires at boats, so knock it out first.",
+      fortX: 430,
+      trenches: [{ x: 430, w: 144, d: 24, water: true }, { x: 606, w: 32, d: 20 }],
+      cliff: { x: 686, h: 40 },
+      fort: [
+        "..................g....g......",
+        "................~~~~.=====....",
+        "~~~.............S..S.C...C.S.S",
+        "C.C..C.C.Sgg.Sm-Sm-S.Cw-oC.SgS"
+      ],
+      extras: [{ type: "balloon", x: 1030, alt: 110 }],
+      arsenal: { doughboy: 4, marine: 2, grenade: 2, mortar: 2, french75: 1, pontoon: 1, spad: 1, barrage: 1 },
+      wind: 2
     }
   ]
 });
